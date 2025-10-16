@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     redis_port: int
     redis_db: int = 0
     redis_password: str = ""
+    redis_chat_history_limit: int = 5
     
     # Ollama
     ollama_host: str

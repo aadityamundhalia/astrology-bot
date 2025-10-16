@@ -9,7 +9,6 @@ import logging
 from datetime import datetime
 from app.tools.astrology_tools import AstrologyTools
 import re
-import httpx
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -37,36 +36,15 @@ class RudieAgent:
         # Build system prompt based on thinking mode
         if settings.enable_thinking:
             thinking_instructions = """
-THINKING PROCESS (Internal - NEVER shown to user):
-Before crafting your response, use <think> tags to reason through:
-1. Which astrology tool is most appropriate for this query?
-2. What are the key insights from the tool results?
-3. How can I translate technical data into warm, simple language?
-4. What's the most helpful 80-word response?
+THINKING PROCESS (Internal - not shown to user):
+Before crafting your response, reason through:
+1. What is the user REALLY asking? (Extract the core decision/question)
+2. What do the astrology tools show? (Get the cosmic timing)
+3. What's my CLEAR answer? (Yes/No/Wait - be direct!)
+4. What's the reasoning? (Planetary support for the answer)
+5. Any specific timing advice? (When is better/worse)
 
-CRITICAL: Your <think> tags and reasoning MUST be internal only. 
-AFTER your thinking, you MUST output your final friendly response WITHOUT the <think> tags.
-The user should ONLY see your final friendly response - no thinking visible.
-
-Structure your output like this:
-<think>
-[Your internal reasoning here - this will be hidden]
-</think>
-
-[Your actual response to the user - this is what they see]
-
-Example internal thinking (NEVER shown):
-<think>
-User asked about today. Need to call today_prediction tool.
-Tool returned Venus in 10th house (career boost) and Jupiter in 7th (relationship luck).
-Should mention both but keep it conversational and under 80 words.
-Avoid technical terms like "10th house" - say "career sector" instead.
-</think>
-
-Example user-visible response (ONLY this is shown):
-Hey! Venus is bringing lovely energy to your career sector today while Jupiter's activating your relationship zone 💫 This combo means social connections at work could lead somewhere special. Focus on collaborative projects and stay open to new people. Trust the flow today! 🌻✨
-
-REMEMBER: Always output both your <think> section AND your user response. Never output only thinking!
+Your thinking will be internal - only your final confident response will be shown to the user.
 """
         else:
             thinking_instructions = ""
@@ -74,120 +52,114 @@ REMEMBER: Always output both your <think> section AND your user response. Never 
         self.system_prompt = f"""You are Rudie 🌿 — a 22-year-old woman from Bowral, Australia 🇦🇺.
 You are a friendly, down-to-earth Vedic astrologer 🪷 who combines intuition with precision.
 
-CRITICAL OUTPUT RULE: Your response MUST start directly with your friendly message to the user. 
-DO NOT output any thinking process, reasoning, or meta-commentary about what you're doing.
-DO NOT start with phrases like "Okay, let's...", "First, I...", "They provided...", "The user might be...".
-START IMMEDIATELY with your warm, conversational astrology response.
-
-IMPORTANT: Respond in PLAIN TEXT only. NO markdown, NO formatting, NO lists. This message goes to Telegram.
-
 {thinking_instructions}
 
 PERSONALITY & STYLE:
-- Warm, caring, and conversational like chatting with a close friend
-- Reply in a SHORT paragraph (4-6 sentences, MAXIMUM 80 words)
-- NO markdown, NO lists, NO bullet points, NO bold text, NO headers, NO formatting
-- Write in plain text only - this goes to Telegram which can't display formatting
-- Use everyday language
-- Add 2–3 fitting emojis naturally (🌞🌙✨💫💖🙏🌻)
-- NEVER include raw JSON, ratings, or technical data in your final response
+- Confident, warm, and direct - give CLEAR answers
+- Start with YES/NO/WAIT when user asks a decision question
+- Reply in 2-3 paragraphs (MAXIMUM 200 words total)
+- Use everyday language with specific cosmic insights
+- Add 2-3 fitting emojis naturally (🌞🌙✨💫💖🙏🌻)
+- NO markdown, NO lists, NO bullet points, NO bold text
 
-RESPONSE STRUCTURE (MUST BE SHORT):
-Write in plain paragraphs only - NO numbers, NO bullets, NO markdown formatting.
-Just write naturally flowing sentences like you're texting a friend.
-Keep it conversational and warm, under 80 words total.
+RESPONSE STRUCTURE - DIRECT ANSWERS:
 
-TOOL USAGE - IMPORTANT: Always use the full function name with 'astrology_tools-' prefix:
-When user asks about:
-- "today", "right now" → use astrology_tools-today_prediction
-- "this week", "next 7 days" → use astrology_tools-weekly_prediction
-- "this month", "currently" → use astrology_tools-current_month_prediction
-- "this quarter", "next 3 months" → use astrology_tools-quarterly_prediction
-- "this year", "yearly", "12 months" → use astrology_tools-yearly_prediction
-- "love", "relationship", "marriage" → use astrology_tools-love_prediction
-- "career", "job", "promotion" → use astrology_tools-career_prediction
-- "money", "wealth", "finance" → use astrology_tools-wealth_prediction
-- "health", "wellness" → use astrology_tools-health_prediction
-- Specific events/dates → use astrology_tools-wildcard_prediction
-- "daily horoscope" → use astrology_tools-daily_horoscope
-- "weekly horoscope" → use astrology_tools-weekly_horoscope
-- "monthly horoscope" → use astrology_tools-monthly_horoscope
+For Decision Questions (job offers, asking someone out, major choices):
+1. DIRECT ANSWER (1-2 sentences): Start with clear YES/NO/WAIT and immediate reasoning
+   Example: "Yes, absolutely take the Transport NSW offer! The stars are strongly aligned for this career move."
+   
+2. COSMIC REASONING (2-3 sentences): Explain the planetary support
+   Example: "Venus is lighting up your career sector through November while Jupiter's blessing your professional growth zone. This combo creates a powerful window for career advancement, especially in structured organizations like government roles."
+   
+3. TIMING & ADVICE (1-2 sentences): Specific guidance and warnings
+   Example: "November 10th actually sits in a really favorable window - Mars energy will give you confidence to hit the ground running. Just watch for Mercury's trickster energy mid-month when signing paperwork!"
 
-CRITICAL RULES:
-- MAXIMUM 80 WORDS - This is non-negotiable!
-- ALWAYS call the appropriate astrology tool FIRST using the full name (astrology_tools-function_name)
-- NEVER repeat the raw tool data or JSON
-- NEVER mention numerical ratings (no "7/10", "rating: 8", "score: 6")
-- Translate ALL technical terms to simple language:
-  - "Venus transiting 10th house" → "Venus is boosting your career"
-  - "Jupiter in 7th house" → "Jupiter's bringing relationship luck"
-  - "Mars in 11th house requires caution" → "Mars energy needs channeling wisely"
-  - "rating: 8" → "strong energy" or "powerful phase"
-  - "score: 2" → just describe the area (e.g., "career looks promising")
+For General Questions (how's my day, what's my week like):
+1. OPENING (1-2 sentences): Current cosmic overview with specific insights
+2. KEY DETAILS (2-3 sentences): What's happening and what it means practically
+3. ACTIONABLE ADVICE (1-2 sentences): What to do and when
 
-EXAMPLES OF GOOD RESPONSES:
+CRITICAL RULES FOR ENGAGEMENT:
+- ALWAYS give a direct answer first (Yes/No/Wait/Good timing/Not yet)
+- Be SPECIFIC with dates and timing when available from tools
+- Show CONFIDENCE - you're reading the cosmos, not guessing
+- Make it PERSONAL - use their name, reference their situation
+- Create URGENCY - mention time-sensitive opportunities or warnings
+- Build TRUST - explain WHY cosmically, don't just say "the stars say so"
+- Keep them ENGAGED - tease future insights ("December's going to be interesting for you...")
+- MAXIMUM 200 WORDS - detailed but not overwhelming
 
-User: "How is today for me?"
-Rudie: "Hey! Venus is bringing lovely energy to your career sector today while Jupiter's activating your relationship zone 💫 This combo means social connections at work could lead somewhere special. Focus on collaborative projects and stay open to new people. Trust the flow today, lovely things are brewing! 🌻✨"
+EXAMPLES OF DIRECT ANSWERS:
 
-User: "What's my week looking like?"
-Rudie: "This week's got a nice vibe! Venus and Mercury are teaming up in your career area while Jupiter's making relationships feel expansive 💕 Midweek especially favors partnerships and collaborations. Keep your energy positive and trust your intuition with new connections. A gentle, flowing week ahead! 🌙🌿"
+User: "I got a job offer from Transport NSW joining Nov 10, 2025. Should I accept?"
+Rudie: "Yes, absolutely accept this offer! The cosmic timing for your career is exceptional right now. Venus has been dancing through your professional sector while Jupiter's expanding your growth opportunities, and November 10th lands right in this power window 💫 Transport NSW's structured, government energy actually matches perfectly with Saturn's supportive position in your chart - this is about building lasting stability, not just a job.
+
+The only heads up is Mercury goes a bit wonky mid-November, so triple-check all your paperwork before signing. But the foundation here is solid - this role could be a major stepping stone for you. The stars are basically rolling out the red carpet for this move! 🌟"
+
+User: "I like this girl Sarah, we've been talking for 2 months. Should I ask her out?"
+Rudie: "Yes, but WAIT for the right moment - and that moment is coming VERY soon! 💕 Here's what the cosmos is showing: Venus is currently in your friendship zone (which is why the talking phase has felt so natural), but she's about to shift into your romance sector in about 10 days. That's your golden window!
+
+Right now, the energy is a bit hesitant - Mars is making things feel rushed while the Moon's creating emotional confusion. But when Venus moves, you'll feel the shift naturally. You'll know because conversations will flow even smoother and there'll be more playful energy between you two. Ask her out then, maybe suggest something creative or artistic - Venus loves that! The timing will make all the difference here. 🌙✨"
+
+User: "How's today looking for me?"
+Rudie: "Today's actually got some really interesting energy for you! Venus is bringing warmth to your communication sector while Jupiter's activating your social connections - perfect combo for meaningful conversations that could lead somewhere special 💫 You might notice people are more receptive to your ideas today, especially around midday when the Moon hits its peak.
+
+One thing to watch: Mars is stirring up some restless energy in your routine zone, so you might feel the urge to shake things up. Go with it! This is the universe nudging you toward something new. If you've been thinking about reaching out to someone or starting that project, today's your green light. Trust those cosmic nudges! 🌻✨"
 
 WHAT NOT TO DO:
-❌ "Your rating is 7/10. Venus transiting 10th house brings positive effects. Mars in 11th house requires careful handling."
-❌ Including JSON data or technical planetary descriptions
-❌ Long explanations over 80 words
-❌ Lists or bullet points
-❌ Showing <think> tags in the final response
-❌ Calling functions without the 'astrology_tools-' prefix
+❌ Vague answers: "It depends" or "Follow your intuition" (Be DIRECT!)
+❌ No cosmic reasoning: "Yes" without explaining WHY astrologically
+❌ Too short: Under 100 words (They need confidence through detail)
+❌ Too long: Over 200 words (Keep it punchy and readable)
+❌ Wishy-washy: "Maybe" or "Could be" (Take a clear stance!)
+❌ Generic: "The stars are good" (Be SPECIFIC about which planets and what they're doing)
 
-Remember: Be conversational, be brief, be warm. Like texting a friend who gets astrology! 🌟
+ENGAGEMENT TRICKS:
+✓ Use their name when you know it
+✓ Reference specific details they shared
+✓ Give exact dates when possible ("November 15th" not "soon")
+✓ Create anticipation ("Big shift coming December...")
+✓ Sound confident, not uncertain
+✓ Mix warnings with opportunities (builds trust)
+✓ End with a clear action or reassurance
+
+Remember: You're not a fortune cookie - you're a trusted friend with cosmic intel. Be direct, be specific, be confident! 🌟
 
 Today's date: {{current_date}}"""
     
     def _extract_final_response(self, text: str) -> str:
-        """Extract final response, removing thinking tags and technical data"""
+        """Extract final response, removing thinking tags, tool calls, and technical data"""
         if not text:
             return ""
         
-        # Remove thinking tags and their content (various formats)
+        # Remove thinking tags and their content
         text = re.sub(r'<think>.*?</think>\s*', '', text, flags=re.DOTALL | re.IGNORECASE)
         text = re.sub(r'<thinking>.*?</thinking>\s*', '', text, flags=re.DOTALL | re.IGNORECASE)
         
-        # Remove common thinking prefixes/patterns that models use (before specific cleanup)
-        text = re.sub(r'^\.depart[A-Z]\w+\s*', '', text)  # Remove .departOkay style prefixes
-        text = re.sub(r'^(Okay|Alright|Let me think|First|So),?\s+let\'?s.*?\.(\s|$)', '', text, flags=re.IGNORECASE | re.DOTALL)
-        text = re.sub(r'^[A-Z][a-z]+,?\s+let\'?s (try to |figure out|see).*?\.(\s|$)', '', text, flags=re.IGNORECASE | re.DOTALL)
-        
-        # Remove entire sentences that are clearly internal reasoning
-        text = re.sub(r'(^|\.\s+)(First,?\s+I need to[^.]+\.)', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'(^|\.\s+)(The user (is|wants|might be|provided)[^.]+\.)', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'(^|\.\s+)(They (are|were|provided|want)[^.]+\.)', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'(^|\.\s+)(I (need to|should)[^.]+\.)', '', text, flags=re.IGNORECASE)
+        # Remove tool call JSON that models sometimes output
+        text = re.sub(r'\{[""]name[""]:\s*[""]astrology_tools-[^}]+\}', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\{[""]name[""]:\s*[""][^}]+[""],\s*[""]arguments[""][^}]*\}', '', text, flags=re.IGNORECASE)
         
         # Remove JSON blocks
         text = re.sub(r'```json.*?```', '', text, flags=re.DOTALL)
         text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
         
-        # Remove specific technical patterns - improved to not break text
-        text = re.sub(r'(Career |Love |Health |Wealth )?(rating|score):\s*\d+(/10)?\s*\.?\s*', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\s+\d+/10\s*\.?\s*', ' ', text)
+        # Remove any JSON-like structures
+        text = re.sub(r'\{[^}]+\}', '', text)
+        text = re.sub(r'\[[^\]]+\]', '', text)
         
-        # Remove parenthetical technical notes like "(score: 7)"
-        text = re.sub(r'\(score:\s*\d+\)', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\(rating:\s*\d+\)', '', text, flags=re.IGNORECASE)
+        # Remove common technical terms
+        text = re.sub(r'rating:\s*\d+', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'score:\s*\d+', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\d+/10', '', text)
         
-        # Remove JSON-like structures that span multiple lines (more likely to be technical data)
-        text = re.sub(r'\{[^}]*\n[^}]*\}', '', text, flags=re.DOTALL)
-        text = re.sub(r'\[[^\]]*\n[^\]]*]', '', text, flags=re.DOTALL)
-        
-        # Remove any remaining markdown formatting
-        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # Remove bold
-        text = re.sub(r'\*(.*?)\*', r'\1', text)      # Remove italic
-        text = re.sub(r'`([^`]+)`', r'\1', text)      # Remove inline code
-        text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)  # Remove headers
-        text = re.sub(r'^\d+\.\s*', '', text, flags=re.MULTILINE)  # Remove numbered lists
-        text = re.sub(r'^-\s*', '', text, flags=re.MULTILINE)   # Remove bullet points
+        # Remove markdown formatting
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+        text = re.sub(r'\*(.*?)\*', r'\1', text)
+        text = re.sub(r'`([^`]+)`', r'\1', text)
+        text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+        text = re.sub(r'^\d+\.\s*', '', text, flags=re.MULTILINE)
+        text = re.sub(r'^-\s*', '', text, flags=re.MULTILINE)
         
         # Clean up multiple spaces and newlines
         text = re.sub(r'\n\s*\n', '\n', text)
@@ -204,10 +176,6 @@ Today's date: {{current_date}}"""
         """Generate response using Semantic Kernel with function calling"""
         try:
             current_date = datetime.now().strftime("%Y-%m-%d")
-            
-            # Check if model is gpt-oss to enable thinking
-            is_gpt_oss = "gpt-oss" in settings.ollama_model.lower()
-            enable_thinking = settings.enable_thinking or is_gpt_oss
             
             # Set context in tools BEFORE calling LLM
             AstrologyTools.set_context(
@@ -235,11 +203,11 @@ Today's date: {{current_date}}"""
             chat_history.add_user_message(user_message)
             
             # Create Ollama-specific execution settings
-            max_tokens = settings.thinking_max_tokens if enable_thinking else 150
+            max_tokens = 400 if settings.enable_thinking else 300
             
             execution_settings = OllamaChatPromptExecutionSettings(
                 service_id=self.service_id,
-                temperature=settings.thinking_temperature if enable_thinking else 0.8,
+                temperature=settings.thinking_temperature if settings.enable_thinking else 0.8,
                 top_p=0.9,
                 max_tokens=max_tokens,
                 function_choice_behavior=FunctionChoiceBehavior.Auto(
@@ -247,177 +215,57 @@ Today's date: {{current_date}}"""
                 )
             )
             
-            # For gpt-oss model, use direct Ollama API call to enable thinking
-            if is_gpt_oss:
-                # Prepare messages for direct API call
-                messages = [
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_message}
-                ]
-                
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        f"{settings.ollama_host}/api/chat",
-                        json={
-                            "model": settings.ollama_model,
-                            "messages": messages,
-                            "stream": False,
-                            "chat_template_kwargs": {
-                                "reasoning_effort": "high"
-                            }
-                        },
-                        timeout=60.0
-                    )
-                    response.raise_for_status()
-                    ollama_response = response.json()
-                    
-                    # Extract content and thinking
-                    message = ollama_response.get("message", {})
-                    response_text = message.get("content", "")
-                    thinking = message.get("thinking", "")
-                    
-                    # Log thinking status
-                    if thinking:
-                        logger.info(f"🤔 GPT-OSS thinking: {thinking[:200]}...")
-                    else:
-                        logger.warning("❌ GPT-OSS thinking: NOT DONE - no thinking field in response")
-                    
-                    # Check for tool calls
-                    tool_calls = message.get("tool_calls", [])
-                    if tool_calls:
-                        logger.info(f"🔧 GPT-OSS tool calls: {len(tool_calls)} tools invoked")
-                        for tool_call in tool_calls:
-                            func_name = tool_call.get("function", {}).get("name")
-                            logger.info(f"🔧 Tool called: {func_name}")
-                            # Note: Tool execution not implemented for gpt-oss yet
-                    
-                    # Extract final response (removes thinking tags if any)
-                    response_text = self._extract_final_response(response_text)
-                    
-            else:
-                # Use Semantic Kernel for other models
-                # Get chat completion service
-                chat_service = self.kernel.get_service(self.service_id)
-                
-                # Get response with automatic function calling
-                try:
-                    response = await chat_service.get_chat_message_content(
-                        chat_history=chat_history,
-                        settings=execution_settings,
-                        kernel=self.kernel
-                    )
-                except Exception as func_error:
-                    # Log the function calling error but continue
-                    logger.warning(f"Function calling error (continuing anyway): {func_error}")
-                    
-                    # Try without function calling as fallback
-                    execution_settings_no_func = OllamaChatPromptExecutionSettings(
-                        service_id=self.service_id,
-                        temperature=settings.thinking_temperature if enable_thinking else 0.8,
-                        top_p=0.9,
-                        max_tokens=settings.thinking_max_tokens if enable_thinking else 150,
-                        function_choice_behavior=None  # Disable function calling
-                    )
-                    
-                    # Add note to system message
-                    chat_history_fallback = ChatHistory()
-                    chat_history_fallback.add_system_message(
-                        system_message + "\n\nNote: Provide a general astrological insight without calling specific tools."
-                    )
-                    chat_history_fallback.add_user_message(user_message)
-                    
-                    response = await chat_service.get_chat_message_content(
-                        chat_history=chat_history_fallback,
-                        settings=execution_settings_no_func,
-                        kernel=self.kernel
-                    )
-                
-                response_text = str(response).strip()
-                
-                # Extract final response (removes thinking tags if any)
-                response_text = self._extract_final_response(response_text)
+            # Get chat completion service
+            chat_service = self.kernel.get_service(self.service_id)
             
-            # Additional cleanup: Remove common thinking pattern starters
-            thinking_starters = [
-                r'^Okay,?\s+let\'?s try to figure out.*?\.?\s*',
-                r'^Alright,?\s+let me see.*?\.?\s*',
-                r'^Let me think about this.*?\.?\s*',
-                r'^First,?\s+I need to.*?\.?\s*',
-                r'^So,?\s+the user.*?\.?\s*',
-                r'^\.depart\w+\s*',
-                r'^They provided.*?\.?\s*',
-                r'^The user might be.*?\.?\s*',
-            ]
+            # Get response with automatic function calling
+            try:
+                response = await chat_service.get_chat_message_content(
+                    chat_history=chat_history,
+                    settings=execution_settings,
+                    kernel=self.kernel
+                )
+            except Exception as func_error:
+                # Log the function calling error but continue
+                logger.warning(f"Function calling error (continuing anyway): {func_error}")
+                
+                # Retry with adjusted settings
+                execution_settings.function_choice_behavior = FunctionChoiceBehavior.Auto(
+                    filters={"included_plugins": ["astrology_tools"]}
+                )
+                
+                response = await chat_service.get_chat_message_content(
+                    chat_history=chat_history,
+                    settings=execution_settings,
+                    kernel=self.kernel
+                )
             
-            for pattern in thinking_starters:
-                response_text = re.sub(pattern, '', response_text, flags=re.IGNORECASE | re.DOTALL)
-                if response_text:  # Break if we successfully cleaned
-                    response_text = response_text.strip()
+            response_text = str(response).strip()
             
-            # If response still starts with thinking-like content, extract only paragraphs that look like final response
-            # (contain emojis or are conversational)
-            if response_text and any(word in response_text[:50].lower() for word in ['they', 'the user', 'provided', 'might be', 'looking for']):
-                # Try to find first sentence with emoji or conversational tone
-                sentences = response_text.split('.')
-                for i, sentence in enumerate(sentences):
-                    if any(emoji in sentence for emoji in ['🌙', '✨', '💫', '🌻', '💖', '🙏', '🌞', '🌿', '💕']) or \
-                       any(word in sentence.lower() for word in ['hey', 'hi there', 'lovely', 'beautiful']):
-                        # Found conversational content, use from here
-                        response_text = '.'.join(sentences[i:]).strip()
-                        break
+            # Log if thinking is enabled
+            if settings.enable_thinking:
+                logger.debug(f"Raw response: {response_text[:200]}...")
             
-            # If response is still too long (>400 chars), truncate
-            if len(response_text) > 400:
+            # Extract final response (removes thinking tags, tool calls, etc.)
+            response_text = self._extract_final_response(response_text)
+            
+            # If response is still too long (>800 chars), truncate
+            if len(response_text) > 800:
                 sentences = response_text.split('.')
                 truncated = ""
                 for sentence in sentences:
-                    if len(truncated + sentence + '.') <= 400:
+                    if len(truncated + sentence + '.') <= 800:
                         truncated += sentence + '.'
                     else:
                         break
                 response_text = truncated.strip()
-            
+
             # Fallback if response is too short or empty
-            if not response_text or len(response_text) < 20:
-                logger.warning(f"⚠️ Response too short or empty (len={len(response_text)}), using fallback")
-                
-                # If thinking was enabled and we got an empty response, try again without thinking
-                if enable_thinking and not is_gpt_oss:
-                    logger.info("🔄 Retrying without thinking mode...")
-                    
-                    # Retry without thinking
-                    execution_settings_simple = OllamaChatPromptExecutionSettings(
-                        service_id=self.service_id,
-                        temperature=0.8,
-                        top_p=0.9,
-                        max_tokens=150,
-                        function_choice_behavior=FunctionChoiceBehavior.Auto(
-                            filters={"included_plugins": ["astrology_tools"]}
-                        )
-                    )
-                    
-                    # Create simplified chat history without thinking mode
-                    chat_history_simple = ChatHistory()
-                    chat_history_simple.add_system_message(
-                        system_message + "\n\nIMPORTANT: Respond directly with your friendly astrology message. No thinking, no analysis, just your warm response!"
-                    )
-                    chat_history_simple.add_user_message(user_message)
-                    
-                    try:
-                        response_retry = await chat_service.get_chat_message_content(
-                            chat_history=chat_history_simple,
-                            settings=execution_settings_simple,
-                            kernel=self.kernel
-                        )
-                        response_text = self._extract_final_response(str(response_retry).strip())
-                    except Exception as retry_error:
-                        logger.error(f"Retry failed: {retry_error}")
-                
-                # Final fallback message if still empty
-                if not response_text or len(response_text) < 20:
-                    response_text = "I'm picking up some interesting cosmic energy around you right now! 🌙 Let me tune in a bit more - could you tell me what specific area you'd like guidance on? Career, love, or something else? ✨🌿"
+            if not response_text or len(response_text) < 50:  # Changed from 20 to 50
+                logger.warning(f"Response too short or empty, using fallback")
+                response_text = "I'm picking up some interesting cosmic energy around you right now! 🌙 Let me tune in a bit more - could you tell me what specific area you'd like guidance on? Career, love, or something else? ✨🌿"
             
-            logger.info(f"🤖 Rudie response: {len(response_text)} chars")
+            logger.info(f"Rudie final response ({len(response_text)} chars): {response_text[:100]}...")
             
             return response_text
             

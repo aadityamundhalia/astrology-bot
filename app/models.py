@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, String, Boolean, DateTime, Time, JSON
+from sqlalchemy import Column, BigInteger, String, Boolean, DateTime, Time, JSON, Text
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
@@ -20,3 +20,12 @@ class User(Base):
     horoscope_data = Column(JSON)
     horary_data = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class ChatHistory(Base):
+    __tablename__ = "chat_history"
+    
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(BigInteger, index=True)
+    message_type = Column(String)  # 'user' or 'bot'
+    message = Column(Text)
+    timestamp = Column(DateTime, default=datetime.utcnow)
