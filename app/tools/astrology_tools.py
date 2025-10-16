@@ -1,7 +1,16 @@
 from semantic_kernel.functions.kernel_function_decorator import kernel_function
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 from typing import Annotated
-import logging
+        try:
+            service, birth_data = self._get_service_and_data()
+            start = start_date if start_date else None
+            end = end_date if end_date else None
+            result = await service.get_health_prediction(birth_data, start, end)
+            logger.info(f"Tool call: health_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            return str(result)
+        except Exception as e:
+            logger.error(f"Error in health_prediction: {e}")
+            return f"Error getting health prediction: {str(e)}"gging
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +48,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_today_prediction(birth_data)
+            logger.info(f"Tool call: today_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in today_prediction: {e}")
@@ -53,6 +63,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_weekly_prediction(birth_data)
+            logger.info(f"Tool call: weekly_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in weekly_prediction: {e}")
@@ -67,6 +78,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_current_month_prediction(birth_data)
+            logger.info(f"Tool call: current_month_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in current_month_prediction: {e}")
@@ -81,6 +93,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_quarterly_prediction(birth_data)
+            logger.info(f"Tool call: quarterly_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in quarterly_prediction: {e}")
@@ -95,6 +108,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_yearly_prediction(birth_data)
+            logger.info(f"Tool call: yearly_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in yearly_prediction: {e}")
@@ -115,6 +129,7 @@ class AstrologyTools:
             start = start_date if start_date else None
             end = end_date if end_date else None
             result = await service.get_love_prediction(birth_data, start, end)
+            logger.info(f"Tool call: love_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in love_prediction: {e}")
@@ -135,6 +150,7 @@ class AstrologyTools:
             start = start_date if start_date else None
             end = end_date if end_date else None
             result = await service.get_career_prediction(birth_data, start, end)
+            logger.info(f"Tool call: career_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in career_prediction: {e}")
@@ -155,6 +171,7 @@ class AstrologyTools:
             start = start_date if start_date else None
             end = end_date if end_date else None
             result = await service.get_wealth_prediction(birth_data, start, end)
+            logger.info(f"Tool call: wealth_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in wealth_prediction: {e}")
@@ -175,6 +192,7 @@ class AstrologyTools:
             start = start_date if start_date else None
             end = end_date if end_date else None
             result = await service.get_health_prediction(birth_data, start, end)
+            logger.info(f"Tool call: health_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in health_prediction: {e}")
@@ -194,6 +212,7 @@ class AstrologyTools:
             service, birth_data = self._get_service_and_data()
             date = specific_date if specific_date else None
             result = await service.get_wildcard_prediction(birth_data, query, date)
+            logger.info(f"Tool call: wildcard_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in wildcard_prediction: {e}")
@@ -208,6 +227,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_daily_horoscope(birth_data)
+            logger.info(f"Tool call: daily_horoscope - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in daily_horoscope: {e}")
@@ -222,6 +242,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_weekly_horoscope(birth_data)
+            logger.info(f"Tool call: weekly_horoscope - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in weekly_horoscope: {e}")
@@ -236,6 +257,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_monthly_horoscope(birth_data)
+            logger.info(f"Tool call: monthly_horoscope - result ({len(str(result))} chars): {str(result)[:100]}...")
             return str(result)
         except Exception as e:
             logger.error(f"Error in monthly_horoscope: {e}")

@@ -1,4 +1,7 @@
 import logging
+# Suppress httpx INFO logs to reduce clutter
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 from fastapi import FastAPI, Depends
 from telegram import Update
 from telegram.ext import ContextTypes
