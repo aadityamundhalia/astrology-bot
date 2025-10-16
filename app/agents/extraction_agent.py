@@ -1,7 +1,7 @@
 import semantic_kernel as sk
 from semantic_kernel.connectors.ai.ollama import OllamaChatCompletion
-from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
+from semantic_kernel.contents.chat_history import ChatHistory
 from config import get_settings
 import logging
 import json
@@ -19,7 +19,7 @@ class ExtractionAgent:
         chat_service = OllamaChatCompletion(
             service_id=self.service_id,
             ai_model_id=settings.ollama_model,
-            url=settings.ollama_host
+            host=settings.ollama_host
         )
         self.kernel.add_service(chat_service)
         

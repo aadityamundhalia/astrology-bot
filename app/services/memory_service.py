@@ -16,7 +16,7 @@ class MemoryService:
                 response = await client.get(
                     f"{self.base_url}/get",
                     params={
-                        "user_id": user_id,
+                        "user_id": str(user_id),  # Convert to string
                         "msg": msg,
                         "num_chats": num_chats,
                         "include_chat_history": "false"
@@ -33,17 +33,43 @@ class MemoryService:
         """Add conversation to memory"""
         async with httpx.AsyncClient() as client:
             try:
+                # Try as JSON first (most APIs prefer this)
                 response = await client.post(
                     f"{self.base_url}/add",
-                    data={
-                        "user_id": user_id,
+                    json={
+                        "user_id": str(user_id),  # Convert to string
                         "user_message": user_message,
                         "ai_message": ai_message
                     },
-                    headers={"accept": "application/json"}
+                    headers={
+                        "accept": "application/json",
+                        "Content-Type": "application/json"
+                    }
                 )
                 response.raise_for_status()
                 return response.json()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 422:
+                    # If JSON fails, try form data
+                    logger.warning("JSON request failed, trying form data")
+                    try:
+                        response = await client.post(
+                            f"{self.base_url}/add",
+                            data={
+                                "user_id": str(user_id),
+                                "user_message": user_message,
+                                "ai_message": ai_message
+                            },
+                            headers={"accept": "application/json"}
+                        )
+                        response.raise_for_status()
+                        return response.json()
+                    except Exception as e2:
+                        logger.error(f"Error adding memory with form data: {e2}")
+                        return {}
+                else:
+                    logger.error(f"Error adding memory: {e}")
+                    return {}
             except Exception as e:
                 logger.error(f"Error adding memory: {e}")
                 return {}

@@ -8,14 +8,13 @@ import re
 from datetime import datetime
 
 from config import get_settings
-from app.database import get_db, engine
+from app.database import get_db, engine, AsyncSessionLocal  # Added AsyncSessionLocal
 from app.models import Base, User
 from app.services.telegram_service import TelegramService
 from app.services.memory_service import MemoryService
 from app.services.astrology_service import AstrologyService
 from app.agents.extraction_agent import ExtractionAgent
 from app.agents.rudie_agent import RudieAgent
-from app.database import AsyncSessionLocal
 
 # Setup logging
 logging.basicConfig(
@@ -34,12 +33,12 @@ astrology_service = AstrologyService()
 extraction_agent = ExtractionAgent()
 rudie_agent = RudieAgent()
 
-# Database initialization
-@app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables created")
+# Remove the database initialization - use Alembic instead
+# @app.on_event("startup")
+# async def startup():
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.create_all)
+#     logger.info("Database tables created")
 
 def validate_birth_data(date_str: str, time_str: str, place_str: str) -> bool:
     """Validate birth data format"""

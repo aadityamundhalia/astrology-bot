@@ -1,9 +1,9 @@
 import semantic_kernel as sk
 from semantic_kernel.connectors.ai.ollama import OllamaChatCompletion
+from semantic_kernel.connectors.ai.ollama.ollama_prompt_execution_settings import OllamaChatPromptExecutionSettings
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
-from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
 from config import get_settings
 import logging
 from datetime import datetime
@@ -21,7 +21,7 @@ class RudieAgent:
         chat_service = OllamaChatCompletion(
             service_id=self.service_id,
             ai_model_id=settings.ollama_model,
-            url=settings.ollama_host
+            host=settings.ollama_host
         )
         self.kernel.add_service(chat_service)
         
@@ -92,6 +92,14 @@ Today's date: {current_date}"""
         try:
             current_date = datetime.now().strftime("%Y-%m-%d")
             
+            # Set context in tools BEFORE calling LLM
+            AstrologyTools.set_context(
+                astrology_service=astrology_service,
+                date_of_birth=user_context['date_of_birth'],
+                time_of_birth=user_context['time_of_birth'],
+                place_of_birth=user_context['place_of_birth']
+            )
+            
             # Prepare system prompt with context
             system_message = self.system_prompt.format(current_date=current_date)
             system_message += f"\n\n<user_info>\nName: {user_context['name']}"
@@ -109,22 +117,12 @@ Today's date: {current_date}"""
             chat_history.add_system_message(system_message)
             chat_history.add_user_message(user_message)
             
-            # Create kernel arguments with astrology service
-            arguments = KernelArguments(
-                astrology_service=astrology_service,
-                date_of_birth=user_context['date_of_birth'],
-                time_of_birth=user_context['time_of_birth'],
-                place_of_birth=user_context['place_of_birth']
-            )
-            
-            # Create execution settings with function calling
-            execution_settings = PromptExecutionSettings(
+            # Create Ollama-specific execution settings
+            execution_settings = OllamaChatPromptExecutionSettings(
                 service_id=self.service_id,
-                extension_data={
-                    "temperature": 0.7,
-                    "top_p": 0.9,
-                    "max_tokens": 2000
-                },
+                temperature=0.7,
+                top_p=0.9,
+                max_tokens=2000,
                 function_choice_behavior=FunctionChoiceBehavior.Auto(
                     filters={"included_plugins": ["astrology_tools"]}
                 )
@@ -137,8 +135,7 @@ Today's date: {current_date}"""
             response = await chat_service.get_chat_message_content(
                 chat_history=chat_history,
                 settings=execution_settings,
-                kernel=self.kernel,
-                arguments=arguments
+                kernel=self.kernel
             )
             
             response_text = str(response).strip()
