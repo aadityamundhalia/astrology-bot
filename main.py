@@ -69,7 +69,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = message.chat.id
         text = message.text
         
-        logger.info(f"Received message from user {user_id}: {text}")
+        logger.info(f"📥 Telegram received: user {user_id} - {len(text)} chars: {text}")
         
         # Start continuous typing indicator
         typing_task = asyncio.create_task(
@@ -214,15 +214,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @app.on_event("startup")
 async def start_bot():
     """Start telegram bot"""
-    # Test Mem0 connection
-    try:
-        logger.info("Testing Mem0 connection...")
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{settings.mem0_service_url}/")
-            logger.info(f"Mem0 service status: {response.status_code}")
-    except Exception as e:
-        logger.warning(f"Could not connect to Mem0 service: {e}")
-        logger.warning("Bot will continue but memory features may not work")
+    logger.info("Starting astrology bot...")
     
     application = telegram_service.setup_application(handle_message)
     await application.initialize()

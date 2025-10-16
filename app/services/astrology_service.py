@@ -29,9 +29,14 @@ class AstrologyService:
                     headers={"accept": "application/json"}
                 )
                 response.raise_for_status()
-                return response.json()
+                result = response.json()
+                logger.info(f"🔮 Astrology API {endpoint}: HTTP {response.status_code}")
+                return result
+            except httpx.HTTPStatusError as e:
+                logger.error(f"🔮 Astrology API {endpoint} failed: HTTP {e.response.status_code} - {e}")
+                raise
             except Exception as e:
-                logger.error(f"Error calling {endpoint}: {e}")
+                logger.error(f"🔮 Astrology API {endpoint} error: {e}")
                 raise
     
     async def get_today_prediction(self, birth_data: dict) -> dict:

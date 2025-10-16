@@ -44,7 +44,7 @@ class TelegramService:
                 text = text[:TELEGRAM_MAX_LENGTH-50] + "\n\n✨ (Message truncated)"
             
             await self.bot.send_message(chat_id=chat_id, text=text)
-            logger.info(f"Sent message to chat {chat_id} ({len(text)} chars): {text[:100]}...")
+            logger.info(f"📤 Telegram sent: chat {chat_id} - {len(text)} chars: {text[:100]}{'...' if len(text) > 100 else ''}")
         except Exception as e:
             logger.error(f"Error sending message: {e}")
             # Try to send error message

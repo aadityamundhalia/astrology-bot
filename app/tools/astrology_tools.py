@@ -1,16 +1,7 @@
 from semantic_kernel.functions.kernel_function_decorator import kernel_function
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 from typing import Annotated
-        try:
-            service, birth_data = self._get_service_and_data()
-            start = start_date if start_date else None
-            end = end_date if end_date else None
-            result = await service.get_health_prediction(birth_data, start, end)
-            logger.info(f"Tool call: health_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
-            return str(result)
-        except Exception as e:
-            logger.error(f"Error in health_prediction: {e}")
-            return f"Error getting health prediction: {str(e)}"gging
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +39,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_today_prediction(birth_data)
-            logger.info(f"Tool call: today_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: today_prediction - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in today_prediction: {e}")
@@ -63,7 +54,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_weekly_prediction(birth_data)
-            logger.info(f"Tool call: weekly_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: weekly_prediction - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in weekly_prediction: {e}")
@@ -78,7 +69,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_current_month_prediction(birth_data)
-            logger.info(f"Tool call: current_month_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: current_month_prediction - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in current_month_prediction: {e}")
@@ -93,7 +84,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_quarterly_prediction(birth_data)
-            logger.info(f"Tool call: quarterly_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: quarterly_prediction - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in quarterly_prediction: {e}")
@@ -108,7 +99,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_yearly_prediction(birth_data)
-            logger.info(f"Tool call: yearly_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: yearly_prediction - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in yearly_prediction: {e}")
@@ -129,7 +120,7 @@ class AstrologyTools:
             start = start_date if start_date else None
             end = end_date if end_date else None
             result = await service.get_love_prediction(birth_data, start, end)
-            logger.info(f"Tool call: love_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: love_prediction - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in love_prediction: {e}")
@@ -150,7 +141,7 @@ class AstrologyTools:
             start = start_date if start_date else None
             end = end_date if end_date else None
             result = await service.get_career_prediction(birth_data, start, end)
-            logger.info(f"Tool call: career_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: career_prediction - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in career_prediction: {e}")
@@ -171,7 +162,7 @@ class AstrologyTools:
             start = start_date if start_date else None
             end = end_date if end_date else None
             result = await service.get_wealth_prediction(birth_data, start, end)
-            logger.info(f"Tool call: wealth_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: wealth_prediction - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in wealth_prediction: {e}")
@@ -192,7 +183,7 @@ class AstrologyTools:
             start = start_date if start_date else None
             end = end_date if end_date else None
             result = await service.get_health_prediction(birth_data, start, end)
-            logger.info(f"Tool call: health_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: health_prediction - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in health_prediction: {e}")
@@ -212,7 +203,7 @@ class AstrologyTools:
             service, birth_data = self._get_service_and_data()
             date = specific_date if specific_date else None
             result = await service.get_wildcard_prediction(birth_data, query, date)
-            logger.info(f"Tool call: wildcard_prediction - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: wildcard_prediction - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in wildcard_prediction: {e}")
@@ -227,7 +218,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_daily_horoscope(birth_data)
-            logger.info(f"Tool call: daily_horoscope - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: daily_horoscope - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in daily_horoscope: {e}")
@@ -242,7 +233,7 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_weekly_horoscope(birth_data)
-            logger.info(f"Tool call: weekly_horoscope - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: weekly_horoscope - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in weekly_horoscope: {e}")
@@ -257,8 +248,198 @@ class AstrologyTools:
         try:
             service, birth_data = self._get_service_and_data()
             result = await service.get_monthly_horoscope(birth_data)
-            logger.info(f"Tool call: monthly_horoscope - result ({len(str(result))} chars): {str(result)[:100]}...")
+            logger.info(f"🔮 Tool call: monthly_horoscope - API result ({len(str(result))} chars): {str(result)[:500]}{'...' if len(str(result)) > 500 else ''}")
             return str(result)
         except Exception as e:
             logger.error(f"Error in monthly_horoscope: {e}")
             return f"Error getting monthly horoscope: {str(e)}"
+    
+    @classmethod
+    def get_tool_definitions(cls):
+        """Get tool definitions in Ollama format for direct API calls"""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "today_prediction",
+                    "description": "Get today's astrological prediction. Use when user asks about 'today', 'right now', or immediate daily guidance.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "weekly_prediction",
+                    "description": "Get this week's (7-day) prediction. Use when user asks about 'this week' or 'next 7 days'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "current_month_prediction",
+                    "description": "Get this month's prediction. Use when user asks about 'this month' or 'currently'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "quarterly_prediction",
+                    "description": "Get this quarter's (3-month) prediction. Use when user asks about 'this quarter' or 'next 3 months'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "yearly_prediction",
+                    "description": "Get this year's prediction. Use when user asks about 'this year', 'yearly', or '12 months'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "love_prediction",
+                    "description": "Get love and relationship prediction. Use when user asks about 'love', 'relationship', or 'marriage'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "career_prediction",
+                    "description": "Get career and job prediction. Use when user asks about 'career', 'job', or 'promotion'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "wealth_prediction",
+                    "description": "Get wealth and money prediction. Use when user asks about 'wealth', 'money', or 'finance'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "health_prediction",
+                    "description": "Get health prediction. Use when user asks about 'health' or 'wellness'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "wildcard_prediction",
+                    "description": "Get a wildcard or general prediction for unspecified topics.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "daily_horoscope",
+                    "description": "Get daily horoscope for a specific zodiac sign.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "sign": {
+                                "type": "string",
+                                "description": "The zodiac sign (e.g., 'aries', 'taurus', 'gemini', etc.)"
+                            }
+                        },
+                        "required": ["sign"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "weekly_horoscope",
+                    "description": "Get weekly horoscope for a specific zodiac sign.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "sign": {
+                                "type": "string",
+                                "description": "The zodiac sign (e.g., 'aries', 'taurus', 'gemini', etc.)"
+                            }
+                        },
+                        "required": ["sign"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "monthly_horoscope",
+                    "description": "Get monthly horoscope for a specific zodiac sign.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "sign": {
+                                "type": "string",
+                                "description": "The zodiac sign (e.g., 'aries', 'taurus', 'gemini', etc.)"
+                            }
+                        },
+                        "required": ["sign"]
+                    }
+                }
+            }
+        ]
+    
+    async def execute_tool(self, tool_name: str, arguments: dict = None):
+        """Execute a tool by name with given arguments"""
+        if arguments is None:
+            arguments = {}
+            
+        method = getattr(self, tool_name, None)
+        if not method:
+            raise ValueError(f"Tool {tool_name} not found")
+            
+        # Call the method (all our tools don't take arguments currently)
+        result = await method()
+        return result
