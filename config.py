@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # Ollama
     ollama_host: str
     ollama_model: str
+    enable_thinking: bool = True
+    thinking_max_tokens: int = 2000
+    thinking_temperature: float = 0.7
     
     # Services
     mem0_service_url: str

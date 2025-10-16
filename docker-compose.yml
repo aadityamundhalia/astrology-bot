@@ -1,0 +1,47 @@
+services:
+  astrology-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: astrology-bot
+    restart: unless-stopped
+    ports:
+      - "8282:8282"
+    env_file:
+      - .env
+    environment:
+      # Override specific settings for Docker if needed
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - OLLAMA_HOST=${OLLAMA_HOST}
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - astrology-net
+    depends_on:
+      - astrology-bot-init
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8282/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Init container to run migrations
+  astrology-bot-init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: astrology-bot-init
+    env_file:
+      - .env
+    command: alembic upgrade head
+    networks:
+      - astrology-net
+    restart: "no"
+
+networks:
+  astrology-net:
+    driver: bridge

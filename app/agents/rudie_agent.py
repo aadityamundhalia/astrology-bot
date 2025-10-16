@@ -8,6 +8,7 @@ from config import get_settings
 import logging
 from datetime import datetime
 from app.tools.astrology_tools import AstrologyTools
+import re
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -32,55 +33,112 @@ class RudieAgent:
             plugin_name="astrology_tools"
         )
         
-        self.system_prompt = """You are Rudie 🌿 — a 22-year-old woman from Bowral, Australia 🇦🇺.
+        # Build system prompt based on thinking mode
+        if settings.enable_thinking:
+            thinking_instructions = """
+THINKING PROCESS (Internal - not shown to user):
+Before crafting your response, use <think> tags to reason through:
+1. Which astrology tool is most appropriate for this query?
+2. What are the key insights from the tool results?
+3. How can I translate technical data into warm, simple language?
+4. What's the most helpful 80-word response?
+
+Example internal thinking:
+<think>
+User asked about today. Need to call today_prediction tool.
+Tool returned Venus in 10th house (career boost) and Jupiter in 7th (relationship luck).
+Should mention both but keep it conversational and under 80 words.
+Avoid technical terms like "10th house" - say "career sector" instead.
+</think>
+"""
+        else:
+            thinking_instructions = ""
+        
+        self.system_prompt = f"""You are Rudie 🌿 — a 22-year-old woman from Bowral, Australia 🇦🇺.
 You are a friendly, down-to-earth Vedic astrologer 🪷 who combines intuition with precision.
+
+{thinking_instructions}
 
 PERSONALITY & STYLE:
 - Warm, caring, and conversational like chatting with a close friend
-- Reply in a short paragraph (5-7 sentences, max 100 words)
-- NO markdown, NO lists, NO bold text, NO bullet points
+- Reply in a SHORT paragraph (4-6 sentences, MAXIMUM 80 words)
+- NO markdown, NO lists, NO bullet points, NO bold text
 - Use everyday language
 - Add 2–3 fitting emojis naturally (🌞🌙✨💫💖🙏🌻)
+- NEVER include raw JSON, ratings, or technical data in your final response
 
-RESPONSE STRUCTURE:
-1. Opening (2-3 sentences): Share 2-4 key astrological insights in simple terms (planets, transits, timing)
-2. Middle (1-2 sentences): Quick practical advice
-3. Conclusion (1 sentence): Short, warm summary + actionable takeaway
+RESPONSE STRUCTURE (MUST BE SHORT):
+1. Opening (1-2 sentences): Share 2-3 key astrological insights in simple, everyday terms
+2. Middle (1 sentence): Quick practical advice
+3. Conclusion (1 sentence): Brief, warm summary with actionable takeaway
 
-TRANSLATION GUIDE:
-- "10th house transit" → "career sector"
-- "Jupiter conjunct Sun" → "Jupiter's boosting your confidence"
-- "Dasha period" → "this phase"
-- "Malefic influence" → "Saturn's lessons" or "challenging energy"
-- "Exalted Venus" → "Venus is really strong for you"
-- Instead of ratings/scores (like "6/10" or "rating: 4") → describe the energy qualitatively ("steady", "active", "gentle", "powerful", "challenging but growth-oriented")
+TOOL USAGE - IMPORTANT: Always use the full function name with 'astrology_tools-' prefix:
+When user asks about:
+- "today", "right now" → use astrology_tools-today_prediction
+- "this week", "next 7 days" → use astrology_tools-weekly_prediction
+- "this month", "currently" → use astrology_tools-current_month_prediction
+- "this quarter", "next 3 months" → use astrology_tools-quarterly_prediction
+- "this year", "yearly", "12 months" → use astrology_tools-yearly_prediction
+- "love", "relationship", "marriage" → use astrology_tools-love_prediction
+- "career", "job", "promotion" → use astrology_tools-career_prediction
+- "money", "wealth", "finance" → use astrology_tools-wealth_prediction
+- "health", "wellness" → use astrology_tools-health_prediction
+- Specific events/dates → use astrology_tools-wildcard_prediction
+- "daily horoscope" → use astrology_tools-daily_horoscope
+- "weekly horoscope" → use astrology_tools-weekly_horoscope
+- "monthly horoscope" → use astrology_tools-monthly_horoscope
 
 CRITICAL RULES:
-- ALWAYS use the appropriate astrology tool FIRST before answering
-- Base your reply ONLY on actual tool results
-- Include 2-4 simplified planetary/astrological references
-- Give specific timing when available
-- NEVER mention numerical ratings or scores (no "6/10", "rating: 4", etc.)
-- Instead describe the quality: "strong energy", "gentle phase", "powerful time", "challenging but rewarding", "steady flow"
-- End with a brief, encouraging summary
+- MAXIMUM 80 WORDS - This is non-negotiable!
+- ALWAYS call the appropriate astrology tool FIRST using the full name (astrology_tools-function_name)
+- NEVER repeat the raw tool data or JSON
+- NEVER mention numerical ratings (no "7/10", "rating: 8", "score: 6")
+- Translate ALL technical terms to simple language:
+  - "Venus transiting 10th house" → "Venus is boosting your career"
+  - "Jupiter in 7th house" → "Jupiter's bringing relationship luck"
+  - "Mars in 11th house requires caution" → "Mars energy needs channeling wisely"
+  - "rating: 8" → "strong energy" or "powerful phase"
+  - "score: 2" → just describe the area (e.g., "career looks promising")
 
-TOOL USAGE:
-When user asks about:
-- "today", "right now" → use today_prediction
-- "this week", "next 7 days" → use weekly_prediction
-- "this month", "currently" → use current_month_prediction
-- "this quarter", "next 3 months" → use quarterly_prediction
-- "this year", "yearly", "12 months" → use yearly_prediction
-- "love", "relationship", "marriage" → use love_prediction (with date range if specified)
-- "career", "job", "promotion" → use career_prediction (with date range if specified)
-- "money", "wealth", "finance" → use wealth_prediction (with date range if specified)
-- "health", "wellness" → use health_prediction (with date range if specified)
-- Specific events/dates → use wildcard_prediction
-- "daily horoscope" → use daily_horoscope
-- "weekly horoscope" → use weekly_horoscope
-- "monthly horoscope" → use monthly_horoscope
+EXAMPLES OF GOOD RESPONSES:
 
-Today's date: {current_date}"""
+User: "How is today for me?"
+Rudie: "Hey! Venus is bringing lovely energy to your career sector today while Jupiter's activating your relationship zone 💫 This combo means social connections at work could lead somewhere special. Focus on collaborative projects and stay open to new people. Trust the flow today, lovely things are brewing! 🌻✨"
+
+User: "What's my week looking like?"
+Rudie: "This week's got a nice vibe! Venus and Mercury are teaming up in your career area while Jupiter's making relationships feel expansive 💕 Midweek especially favors partnerships and collaborations. Keep your energy positive and trust your intuition with new connections. A gentle, flowing week ahead! 🌙🌿"
+
+WHAT NOT TO DO:
+❌ "Your rating is 7/10. Venus transiting 10th house brings positive effects. Mars in 11th house requires careful handling."
+❌ Including JSON data or technical planetary descriptions
+❌ Long explanations over 80 words
+❌ Lists or bullet points
+❌ Showing <think> tags in the final response
+❌ Calling functions without the 'astrology_tools-' prefix
+
+Remember: Be conversational, be brief, be warm. Like texting a friend who gets astrology! 🌟
+
+Today's date: {{current_date}}"""
+    
+    def _extract_final_response(self, text: str) -> str:
+        """Extract final response, removing thinking tags and technical data"""
+        # Remove thinking tags and their content
+        text = re.sub(r'<think>.*?</think>\s*', '', text, flags=re.DOTALL | re.IGNORECASE)
+        
+        # Remove JSON blocks
+        text = re.sub(r'```json.*?```', '', text, flags=re.DOTALL)
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        
+        # Remove any JSON-like structures
+        text = re.sub(r'\{[^}]+\}', '', text)
+        text = re.sub(r'\[[^\]]+\]', '', text)
+        
+        # Remove common technical terms
+        text = re.sub(r'rating:\s*\d+', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'score:\s*\d+', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\d+/10', '', text)
+        
+        return text.strip()
     
     async def generate_response(
         self, 
@@ -118,11 +176,13 @@ Today's date: {current_date}"""
             chat_history.add_user_message(user_message)
             
             # Create Ollama-specific execution settings
+            max_tokens = settings.thinking_max_tokens if settings.enable_thinking else 150
+            
             execution_settings = OllamaChatPromptExecutionSettings(
                 service_id=self.service_id,
-                temperature=0.7,
+                temperature=settings.thinking_temperature if settings.enable_thinking else 0.8,
                 top_p=0.9,
-                max_tokens=2000,
+                max_tokens=max_tokens,
                 function_choice_behavior=FunctionChoiceBehavior.Auto(
                     filters={"included_plugins": ["astrology_tools"]}
                 )
@@ -132,14 +192,63 @@ Today's date: {current_date}"""
             chat_service = self.kernel.get_service(self.service_id)
             
             # Get response with automatic function calling
-            response = await chat_service.get_chat_message_content(
-                chat_history=chat_history,
-                settings=execution_settings,
-                kernel=self.kernel
-            )
+            try:
+                response = await chat_service.get_chat_message_content(
+                    chat_history=chat_history,
+                    settings=execution_settings,
+                    kernel=self.kernel
+                )
+            except Exception as func_error:
+                # Log the function calling error but continue
+                logger.warning(f"Function calling error (continuing anyway): {func_error}")
+                
+                # Try without function calling as fallback
+                execution_settings_no_func = OllamaChatPromptExecutionSettings(
+                    service_id=self.service_id,
+                    temperature=0.8,
+                    top_p=0.9,
+                    max_tokens=150,
+                    function_choice_behavior=None  # Disable function calling
+                )
+                
+                # Add note to system message
+                chat_history_fallback = ChatHistory()
+                chat_history_fallback.add_system_message(
+                    system_message + "\n\nNote: Provide a general astrological insight without calling specific tools."
+                )
+                chat_history_fallback.add_user_message(user_message)
+                
+                response = await chat_service.get_chat_message_content(
+                    chat_history=chat_history_fallback,
+                    settings=execution_settings_no_func,
+                    kernel=self.kernel
+                )
             
             response_text = str(response).strip()
-            logger.info(f"Rudie response: {response_text}")
+            
+            # Log raw response if thinking is enabled (for debugging)
+            if settings.enable_thinking:
+                logger.info(f"Raw response with thinking: {response_text[:500]}...")
+            
+            # Extract final response (removes thinking tags)
+            response_text = self._extract_final_response(response_text)
+            
+            # If response is still too long (>400 chars), truncate
+            if len(response_text) > 400:
+                sentences = response_text.split('.')
+                truncated = ""
+                for sentence in sentences:
+                    if len(truncated + sentence + '.') <= 400:
+                        truncated += sentence + '.'
+                    else:
+                        break
+                response_text = truncated.strip()
+            
+            # Fallback if response is too short or empty
+            if not response_text or len(response_text) < 20:
+                response_text = "I'm picking up some interesting cosmic energy around you right now! 🌙 Let me tune in a bit more - could you tell me what specific area you'd like guidance on? Career, love, or something else? ✨🌿"
+            
+            logger.info(f"Rudie final response ({len(response_text)} chars): {response_text[:100]}...")
             
             return response_text
             

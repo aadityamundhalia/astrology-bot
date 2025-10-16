@@ -6,9 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import re
 from datetime import datetime
+import asyncio
+import httpx
 
 from config import get_settings
-from app.database import get_db, engine, AsyncSessionLocal  # Added AsyncSessionLocal
+from app.database import get_db, engine, AsyncSessionLocal
 from app.models import Base, User
 from app.services.telegram_service import TelegramService
 from app.services.memory_service import MemoryService
@@ -33,13 +35,6 @@ astrology_service = AstrologyService()
 extraction_agent = ExtractionAgent()
 rudie_agent = RudieAgent()
 
-# Remove the database initialization - use Alembic instead
-# @app.on_event("startup")
-# async def startup():
-#     async with engine.begin() as conn:
-#         await conn.run_sync(Base.metadata.create_all)
-#     logger.info("Database tables created")
-
 def validate_birth_data(date_str: str, time_str: str, place_str: str) -> bool:
     """Validate birth data format"""
     if not all([date_str, time_str, place_str]):
@@ -61,6 +56,10 @@ def validate_birth_data(date_str: str, time_str: str, place_str: str) -> bool:
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming telegram messages"""
+    # Create stop event for typing indicator
+    stop_typing = asyncio.Event()
+    typing_task = None
+    
     try:
         message = update.message
         user_id = message.from_user.id
@@ -69,8 +68,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         logger.info(f"Received message from user {user_id}: {text}")
         
-        # Send typing indicator
-        await telegram_service.send_typing(chat_id)
+        # Start continuous typing indicator
+        typing_task = asyncio.create_task(
+            telegram_service.keep_typing(chat_id, stop_typing)
+        )
         
         # Get database session
         async with AsyncSessionLocal() as db:
@@ -115,11 +116,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user.place_of_birth = extracted["place_of_birth"]
                     await db.commit()
                     
+                    # Stop typing and send response
+                    stop_typing.set()
+                    if typing_task:
+                        await typing_task
+                    
                     response = "Thanks for sharing your details 🌿\nWhat would you like me to look into for you today? 🌞"
                     await telegram_service.send_message(chat_id, response)
                     return
                 else:
-                    # Ask for birth data
+                    # Stop typing and ask for birth data
+                    stop_typing.set()
+                    if typing_task:
+                        await typing_task
+                    
                     response = ("Please provide below in exact format:\n\n"
                                "Date of Birth: 1970-11-22\n"
                                "Time of Birth: 00:25\n"
@@ -128,7 +138,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return
             
             # User has birth data, process astrology query
-            await telegram_service.send_typing(chat_id)
+            # (typing indicator is still running)
             
             # Get memories
             memories = await memory_service.get_memories(user_id, text)
@@ -142,7 +152,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "memories": memories.get("data", "")
             }
             
-            # Generate response using Rudie agent
+            # Generate response using Rudie agent (typing continues during this)
             response = await rudie_agent.generate_response(
                 user_message=text,
                 user_context=user_context,
@@ -153,14 +163,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = re.sub(r'<think>.*?</think>\s*', '', response, flags=re.DOTALL)
             response = response.strip()
             
+            # Stop typing indicator
+            stop_typing.set()
+            if typing_task:
+                await typing_task
+            
             # Send response
             await telegram_service.send_message(chat_id, response)
             
-            # Add to memory
-            await memory_service.add_memory(user_id, text, response)
+            # Add to memory (in background, don't wait)
+            async def add_memory_safe():
+                try:
+                    await memory_service.add_memory(user_id, text, response)
+                except Exception as e:
+                    logger.error(f"Failed to add memory in background: {e}")
+
+            asyncio.create_task(add_memory_safe())
+
             
     except Exception as e:
         logger.error(f"Error handling message: {e}", exc_info=True)
+        
+        # Stop typing on error
+        stop_typing.set()
+        if typing_task:
+            try:
+                await typing_task
+            except:
+                pass
+        
         try:
             await telegram_service.send_message(
                 chat_id,
@@ -168,10 +199,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except:
             pass
+    finally:
+        # Ensure typing is stopped
+        stop_typing.set()
+        if typing_task and not typing_task.done():
+            try:
+                await typing_task
+            except:
+                pass
 
 @app.on_event("startup")
 async def start_bot():
     """Start telegram bot"""
+    # Test Mem0 connection
+    try:
+        logger.info("Testing Mem0 connection...")
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{settings.mem0_service_url}/")
+            logger.info(f"Mem0 service status: {response.status_code}")
+    except Exception as e:
+        logger.warning(f"Could not connect to Mem0 service: {e}")
+        logger.warning("Bot will continue but memory features may not work")
+    
     application = telegram_service.setup_application(handle_message)
     await application.initialize()
     await application.start()
