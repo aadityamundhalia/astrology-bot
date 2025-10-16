@@ -16,7 +16,7 @@ class MemoryService:
                 response = await client.get(
                     f"{self.base_url}/get",
                     params={
-                        "user_id": user_id,  # Keep as int, not string
+                        "user_id": user_id,
                         "msg": msg,
                         "num_chats": num_chats,
                         "include_chat_history": "false"
@@ -25,14 +25,25 @@ class MemoryService:
                 )
                 response.raise_for_status()
                 result = response.json()
-                memories = result.get("data", "")
-                logger.info(f"🧠 Mem0 retrieved: HTTP {response.status_code} - {len(memories)} chars for user {user_id}")
+                
+                # Validate result is not None
+                if result is None:
+                    logger.warning(f"🧠 Mem0 returned None for user {user_id}")
+                    return {"data": ""}
+                
+                # Ensure result has 'data' key
+                if not isinstance(result, dict):
+                    logger.warning(f"🧠 Mem0 returned non-dict: {type(result)}")
+                    return {"data": ""}
+                
+                logger.debug(f"🧠 Mem0 memories retrieved for user {user_id}")
                 return result
+                
             except httpx.HTTPError as e:
-                logger.error(f"🧠 Mem0 get failed: HTTP {e.response.status_code if hasattr(e, 'response') and e.response else 'unknown'} - {e}")
+                logger.error(f"🧠 Mem0 HTTP error getting memories: {e}")
                 if hasattr(e, 'response') and e.response is not None:
-                    logger.error(f"Response status: {e.response.status_code}")
-                    logger.error(f"Response body: {e.response.text}")
+                    logger.error(f"   Response status: {e.response.status_code}")
+                    logger.error(f"   Response body: {e.response.text}")
                 return {"data": ""}
             except Exception as e:
                 logger.error(f"🧠 Mem0 get error: {e}", exc_info=True)
@@ -42,14 +53,13 @@ class MemoryService:
         """Add conversation to memory"""
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
-                # Prepare payload exactly as documented
                 payload = {
-                    "user_id": user_id,  # Integer, not string
+                    "user_id": user_id,
                     "user_message": user_message,
                     "ai_message": ai_message
                 }
                 
-                logger.debug(f"Adding memory for user {user_id}, payload: {payload}")
+                logger.debug(f"🧠 Adding memory for user {user_id}")
                 
                 response = await client.post(
                     f"{self.base_url}/add",
@@ -62,16 +72,26 @@ class MemoryService:
                 
                 response.raise_for_status()
                 result = response.json()
-                logger.info(f"🧠 Mem0 added: HTTP {response.status_code} - user {user_id} - {len(user_message)} chars input, {len(ai_message)} chars response")
+                
+                # Validate result
+                if result is None:
+                    logger.warning(f"🧠 Mem0 add returned None for user {user_id}")
+                    return {"status": "success"}
+                
+                logger.info(f"🧠 Memory added successfully for user {user_id}")
                 return result
                 
             except httpx.HTTPStatusError as e:
-                logger.error(f"🧠 Mem0 add failed: HTTP {e.response.status_code} - {e}")
-                logger.error(f"Status code: {e.response.status_code}")
-                logger.error(f"Response body: {e.response.text}")
-                logger.error(f"Request payload: {payload}")
-                raise
+                logger.error(f"🧠 Mem0 HTTP Status error adding memory: {e}")
+                logger.error(f"   Status code: {e.response.status_code}")
+                logger.error(f"   Response body: {e.response.text}")
+                return {"status": "error", "message": str(e)}
+                
+            except httpx.RequestError as e:
+                logger.error(f"🧠 Mem0 Request error: {e}", exc_info=True)
+                logger.error(f"   Failed to connect to Mem0 at {self.base_url}")
+                return {"status": "error", "message": "Connection failed"}
+                
             except Exception as e:
-                logger.error(f"🧠 Mem0 add error: {e}", exc_info=True)
-                logger.error(f"Request payload: {payload}")
-                raise
+                logger.error(f"🧠 Mem0 unexpected error: {e}", exc_info=True)
+                return {"status": "error", "message": str(e)}

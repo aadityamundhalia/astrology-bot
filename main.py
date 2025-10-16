@@ -343,16 +343,28 @@ Your cosmic profile has been refreshed! What would you like to know? 🌟"""
             # User has birth data, process astrology query
             # (typing indicator is still running)
             
-            # Get memories
-            memories = await memory_service.get_memories(user_id, text)
-            
+            # Get memories (with safe fallback)
+            try:
+                memories_result = await memory_service.get_memories(user_id, text)
+                memory_data = ""
+                
+                if memories_result and isinstance(memories_result, dict):
+                    memory_data = memories_result.get("data", "")
+                else:
+                    logger.warning(f"🧠 Invalid memories result: {type(memories_result)}")
+                    memory_data = ""
+                    
+            except Exception as e:
+                logger.warning(f"🧠 Failed to get memories, continuing without: {e}")
+                memory_data = ""
+
             # Prepare user context
             user_context = {
                 "name": user.first_name,
                 "date_of_birth": user.date_of_birth,
                 "time_of_birth": user.time_of_birth,
                 "place_of_birth": user.place_of_birth,
-                "memories": memories.get("data", "")
+                "memories": memory_data
             }
             
             # Generate response using Rudie agent (typing continues during this)
@@ -653,11 +665,22 @@ birth_details_conversation = ConversationHandler(
 @app.on_event("startup")
 async def start_bot():
     """Start telegram bot"""
-    logger.info("Starting astrology bot...")
+    logger.info("🚀 Starting astrology bot...")
     
+    # Test Mem0 connection
+    try:
+        logger.info("🧠 Testing Mem0 connection...")
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{settings.mem0_service_url}/")
+            logger.info(f"🧠 Mem0 service responding: HTTP {response.status_code}")
+    except Exception as e:
+        logger.warning(f"🧠 Could not connect to Mem0 service: {e}")
+        logger.warning("⚠️  Bot will continue but memory features may not work")
+    
+    # Start Telegram bot
     application = telegram_service.setup_application(
         message_handler=handle_message,
-        conversation_handler=birth_details_conversation,  # Add this
+        conversation_handler=birth_details_conversation,
         clear_handler=handle_clear_command,
         start_handler=handle_start_command,
         help_handler=handle_help_command,
@@ -666,7 +689,7 @@ async def start_bot():
     await application.initialize()
     await application.start()
     await application.updater.start_polling()
-    logger.info("Telegram bot started")
+    logger.info("✅ Telegram bot started successfully")
 
 @app.on_event("shutdown")
 async def stop_bot():
