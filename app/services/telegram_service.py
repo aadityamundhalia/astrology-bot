@@ -31,7 +31,7 @@ class TelegramService:
     
     async def send_typing(self, chat_id: int):
         """Send typing indicator to show bot is processing"""
-        try:
+        try: 
             await self.bot.send_chat_action(chat_id=chat_id, action="typing")
         except Exception as e:
             logger.error(f"Error sending typing action: {e}")
@@ -94,19 +94,50 @@ class TelegramService:
         
         return self.application
     
-    async def save_chat_to_db(self, db: AsyncSession, user_id: int, message_type: str, message: str):
-        """Save chat message to database"""
+    async def save_chat_to_db(self, db, user_id: int, message_type: str, message: str):
+        """Save chat message to database with encryption support"""
         try:
-            chat_entry = ChatHistory(
+            from app.models import User, ChatHistory
+            from app.utils.encryption import get_encryption
+            from sqlalchemy import select
+            
+            # Check if user wants encryption
+            stmt = select(User).where(User.id == user_id)
+            result = await db.execute(stmt)
+            user = result.scalar_one_or_none()
+            
+            should_encrypt = user and user.encrypt_chats
+            
+            # Encrypt message if needed
+            if should_encrypt:
+                encryption = get_encryption()
+                encrypted_message = encryption.encrypt(message)
+                is_encrypted = True
+                stored_message = encrypted_message
+            else:
+                is_encrypted = False
+                stored_message = message
+            
+            # Save to database
+            chat = ChatHistory(
                 user_id=user_id,
                 message_type=message_type,
-                message=message,
-                timestamp=datetime.utcnow()
+                message=stored_message,
+                is_encrypted=is_encrypted
             )
-            db.add(chat_entry)
+            db.add(chat)
             await db.commit()
+            
+            # Conditional logging
+            if not should_encrypt:
+                logger.info(f"Saved {message_type} message for user {user_id}")
+            else:
+                logger.info(f"Saved encrypted {message_type} message for user {user_id}")
+            
         except Exception as e:
             logger.error(f"Error saving chat to DB: {e}")
+            await db.rollback()
+
     
     def save_chat_to_redis(self, user_id: int, message_type: str, message: str):
         """Save chat to Redis with sliding window limit"""
@@ -137,25 +168,66 @@ class TelegramService:
         except Exception as e:
             logger.error(f"Error saving chat to Redis: {e}")
     
+    def clear_redis_history(self, user_id: int):
+        """Clear user's chat history from Redis"""
+        try:
+            key = f"chat_history:{user_id}"
+            self.redis_client.delete(key)
+            logger.info(f"🗑️ Cleared Redis history for user {user_id}")
+        except Exception as e:
+            logger.error(f"Error clearing Redis history for user {user_id}: {e}")
+
     async def clear_user_history(self, db: AsyncSession, user_id: int):
         """Clear user's chat history from DB and Redis"""
         try:
-            await db.execute(f"DELETE FROM chat_history WHERE user_id = {user_id}")
+            from sqlalchemy import delete
+            from app.models import ChatHistory
+            
+            # Delete from database
+            stmt = delete(ChatHistory).where(ChatHistory.user_id == user_id)
+            await db.execute(stmt)
             await db.commit()
             
-            key = f"chat_history:{user_id}"
-            self.redis_client.delete(key)
+            # Clear from Redis
+            self.clear_redis_history(user_id)
             
             logger.info(f"🗑️ Cleared chat history for user {user_id}")
         except Exception as e:
             logger.error(f"Error clearing history for user {user_id}: {e}")
+            await db.rollback()
     
-    async def get_chat_history_from_redis(self, user_id: int) -> list:
-        """Get chat history from Redis"""
+    async def get_chat_history(self, db, user_id: int, limit: int = 5) -> list:
+        """Get chat history from database with decryption support"""
         try:
-            key = f"chat_history:{user_id}"
-            history = self.redis_client.lrange(key, 0, -1)
-            return history
+            from app.models import ChatHistory
+            from app.utils.encryption import get_encryption
+            from sqlalchemy import select
+            
+            stmt = select(ChatHistory).where(
+                ChatHistory.user_id == user_id
+            ).order_by(ChatHistory.timestamp.desc()).limit(limit)
+            
+            result = await db.execute(stmt)
+            chats = result.scalars().all()
+            
+            # Decrypt messages if needed
+            encryption = get_encryption()
+            decrypted_chats = []
+            
+            for chat in reversed(chats):
+                if chat.is_encrypted:
+                    decrypted_message = encryption.decrypt(chat.message)
+                else:
+                    decrypted_message = chat.message
+                
+                decrypted_chats.append({
+                    'type': chat.message_type,
+                    'message': decrypted_message,
+                    'timestamp': chat.timestamp
+                })
+            
+            return decrypted_chats
+            
         except Exception as e:
-            logger.error(f"Error getting chat history from Redis: {e}")
+            logger.error(f"Error getting chat history: {e}")
             return []

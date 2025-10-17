@@ -49,6 +49,21 @@ class AstrologyWorker:
             user_id = request_data['user_id']
             chat_id = request_data['chat_id']
             text = request_data['message']
+            
+            # Check if user has encryption enabled for logging
+            async with AsyncSessionLocal() as db:
+                stmt = select(User).where(User.id == user_id)
+                result = await db.execute(stmt)
+                user = result.scalar_one_or_none()
+                
+                should_encrypt = user and user.encrypt_chats
+                
+                # Conditional logging
+                if should_encrypt:
+                    logger.info(f"🔮 Processing encrypted query for user {user_id}")
+                else:
+                    logger.info(f"🔮 Processing astrology query for user {user_id}: {text[:50]}...")
+
             request_id = request_data.get('request_id', 'unknown')
             
             # Skip test messages

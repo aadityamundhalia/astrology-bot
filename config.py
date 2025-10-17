@@ -1,5 +1,24 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import os
+from pathlib import Path
+
+def find_env_file():
+    """Find .env file in current or parent directories"""
+    current = Path.cwd()
+    
+    # Check current directory
+    if (current / '.env').exists():
+        return str(current / '.env')
+    
+    # Check parent directories (up to 3 levels)
+    for _ in range(3):
+        current = current.parent
+        if (current / '.env').exists():
+            return str(current / '.env')
+    
+    # Default to .env in current directory
+    return '.env'
 
 class Settings(BaseSettings):
     # Telegram
@@ -43,6 +62,9 @@ class Settings(BaseSettings):
     max_strikes: int = 3
     enable_profanity_filter: bool = True
     
+    # Chat Encryption
+    chat_encryption_key: str
+    
     # App
     log_level: str = "INFO"
     
@@ -61,7 +83,8 @@ class Settings(BaseSettings):
         return f"amqp://{self.rabbitmq_user}:{self.rabbitmq_password}@{self.rabbitmq_host}:{self.rabbitmq_port}{self.rabbitmq_vhost}"
     
     class Config:
-        env_file = ".env"
+        env_file = find_env_file()
+        env_file_encoding = 'utf-8'
         case_sensitive = False
 
 @lru_cache()

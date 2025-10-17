@@ -24,11 +24,39 @@ async def get_user(user_id: int):
             print(f"   Status: {'✅ Active' if user.is_active else '❌ Inactive'}")
             print(f"   Priority: {user.priority} {'⚡' if user.priority <= 2 else ''}")
             print(f"   Strikes: {user.strikes}/{settings.max_strikes} {'⚠️' if user.strikes > 0 else '✅'}")
+            print(f"   Encryption: {'🔐 Enabled' if user.encrypt_chats else '📝 Disabled'}")
             print(f"   Username: @{user.username if user.username else 'N/A'}")
         else:
             print(f"❌ User {user_id} not found")
         
         return user
+
+async def toggle_encryption(user_id: int, enable: bool):
+    """Enable or disable chat encryption for a user"""
+    async with AsyncSessionLocal() as db:
+        stmt = select(User).where(User.id == user_id)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if user:
+            old_state = user.encrypt_chats
+            user.encrypt_chats = enable
+            
+            if enable and not old_state:
+                # Encrypt all existing unencrypted chats
+                from app.handlers.conversation_handlers import encrypt_user_chats
+                await encrypt_user_chats(user_id, db)
+                print(f"✅ Encryption enabled for {user.first_name} (ID: {user_id})")
+                print(f"   All previous unencrypted chats have been encrypted")
+            elif not enable and old_state:
+                print(f"✅ Encryption disabled for {user.first_name} (ID: {user_id})")
+                print(f"   Previously encrypted chats remain encrypted")
+            else:
+                print(f"ℹ️  No change - encryption was already {'enabled' if enable else 'disabled'}")
+            
+            await db.commit()
+        else:
+            print(f"❌ User {user_id} not found")
 
 async def set_user_status(user_id: int, is_active: bool):
     """Activate or deactivate user"""
@@ -104,6 +132,8 @@ Usage:
   python scripts/manage_user.py deactivate <user_id>
   python scripts/manage_user.py priority <user_id> <1-10>
   python scripts/manage_user.py reset-strikes <user_id>
+  python scripts/manage_user.py encrypt <user_id>
+  python scripts/manage_user.py unencrypt <user_id>
         """)
         sys.exit(1)
     
@@ -121,6 +151,10 @@ Usage:
         await set_user_priority(int(sys.argv[2]), int(sys.argv[3]))
     elif command == "reset-strikes" and len(sys.argv) >= 3:
         await reset_strikes(int(sys.argv[2]))
+    elif command == "encrypt" and len(sys.argv) >= 3:
+        await toggle_encryption(int(sys.argv[2]), True)
+    elif command == "unencrypt" and len(sys.argv) >= 3:
+        await toggle_encryption(int(sys.argv[2]), False)
     else:
         print("❌ Invalid command")
         sys.exit(1)

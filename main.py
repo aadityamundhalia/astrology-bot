@@ -1,54 +1,48 @@
+"""Main application entry point"""
+import asyncio
 import logging
-logging.getLogger("httpx").setLevel(logging.WARNING)
+import sys
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from telegram.ext import ConversationHandler, CommandHandler, MessageHandler, filters
-from contextlib import asynccontextmanager
 import httpx
-import asyncio
 
 from config import get_settings
 from app.services.telegram_service import TelegramService
 from app.services.memory_service import MemoryService
 from app.services.astrology_service import AstrologyService
 from app.services.queue_service import QueueService
-from app.agents.extraction_agent import ExtractionAgent
 from app.agents.rudie_agent import RudieAgent
+from app.agents.extraction_agent import ExtractionAgent
 from app.workers.astrology_worker import AstrologyWorker
 
-# Import handlers
+# Import handlers - remove the state imports
 from app.handlers.command_handlers import (
-    handle_start_command,
-    handle_help_command,
-    handle_info_command,
-    handle_clear_command
+    handle_start,
+    handle_help,
+    handle_clear,
+    handle_info
 )
-from app.handlers.conversation_handlers import (
-    BIRTH_DATE, BIRTH_TIME, BIRTH_PLACE,
-    start_birth_details_wizard,
-    receive_birth_date,
-    receive_birth_time,
-    receive_birth_place,
-    cancel_wizard
-)
+from app.handlers.conversation_handlers import birth_details_conversation  # Just import the handler
 from app.handlers.message_handler import handle_message
 
-# Setup logging
+# Configure logging
+settings = get_settings()
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, settings.log_level),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-settings = get_settings()
-
-# Initialize services (global scope so they persist)
+# Initialize services
 telegram_service = TelegramService()
-memory_service = MemoryService(telegram_service=telegram_service)
+memory_service = MemoryService()
 astrology_service = AstrologyService()
 queue_service = QueueService()
+
+# Initialize agents
 extraction_agent = ExtractionAgent()
-rudie_agent = RudieAgent()
+rudie_agent = RudieAgent(astrology_service)
 
 # Initialize worker
 astrology_worker = AstrologyWorker(
@@ -58,54 +52,35 @@ astrology_worker = AstrologyWorker(
     rudie_agent=rudie_agent
 )
 
-# Wrapper functions to inject services
+# Create FastAPI app
+app = FastAPI(title="Astrology Bot")
+
+# Wrapper functions for handlers
 async def _handle_start(update, context):
-    return await handle_start_command(update, context, telegram_service)
+    """Wrapper for start handler"""
+    return await handle_start(update, context, telegram_service)
 
 async def _handle_help(update, context):
-    return await handle_help_command(update, context, telegram_service)
+    """Wrapper for help handler"""
+    return await handle_help(update, context)
 
 async def _handle_info(update, context):
-    return await handle_info_command(update, context, telegram_service)
+    """Wrapper for info handler"""
+    return await handle_info(update, context)
 
 async def _handle_clear(update, context):
-    return await handle_clear_command(update, context, telegram_service)
+    """Wrapper for clear handler"""
+    return await handle_clear(update, context, telegram_service, memory_service)
 
 async def _handle_message(update, context):
+    """Wrapper for message handler"""
     return await handle_message(
-        update, context, telegram_service, queue_service, extraction_agent
+        update,
+        context,
+        telegram_service,
+        queue_service,
+        extraction_agent
     )
-
-async def _start_wizard(update, context):
-    return await start_birth_details_wizard(update, context, telegram_service)
-
-async def _receive_date(update, context):
-    return await receive_birth_date(update, context, telegram_service)
-
-async def _receive_time(update, context):
-    return await receive_birth_time(update, context, telegram_service)
-
-async def _receive_place(update, context):
-    return await receive_birth_place(update, context, telegram_service)
-
-async def _cancel_wizard(update, context):
-    return await cancel_wizard(update, context, telegram_service)
-
-# Create conversation handler
-birth_details_conversation = ConversationHandler(
-    entry_points=[
-        CommandHandler("change", _start_wizard),
-        CommandHandler("setup", _start_wizard),
-    ],
-    states={
-        BIRTH_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, _receive_date)],
-        BIRTH_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, _receive_time)],
-        BIRTH_PLACE: [MessageHandler(filters.TEXT & ~filters.COMMAND, _receive_place)],
-    },
-    fallbacks=[CommandHandler("cancel", _cancel_wizard)],
-    name="birth_details",
-    persistent=False,
-)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -126,6 +101,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"🧠 Could not connect to Mem0 service: {e}")
         logger.warning("⚠️  Bot will continue but memory features may not work")
+    
+    # Test encryption
+    try:
+        from app.utils.encryption import get_encryption
+        encryption = get_encryption()
+        test_encrypted = encryption.encrypt("test")
+        test_decrypted = encryption.decrypt(test_encrypted)
+        if test_decrypted == "test":
+            logger.info("🔐 Encryption system initialized successfully")
+        else:
+            logger.error("❌ Encryption test failed")
+    except Exception as e:
+        logger.error(f"❌ Encryption initialization failed: {e}")
+        logger.error("⚠️  Chat encryption will not work!")
     
     # Connect to RabbitMQ
     try:
@@ -186,11 +175,13 @@ async def lifespan(app: FastAPI):
         await telegram_service.application.shutdown()
     logger.info("✅ Telegram bot stopped")
 
-# Create FastAPI app with lifespan
-app = FastAPI(
-    title="Rudie Astrology Bot",
-    lifespan=lifespan
-)
+# Use lifespan
+app = FastAPI(title="Astrology Bot", lifespan=lifespan)
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "Astrology Bot is running", "bot": "rudie"}
 
 @app.get("/health")
 async def health_check():
@@ -198,7 +189,8 @@ async def health_check():
     return {
         "status": "healthy",
         "bot": "rudie",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "encryption": "enabled"
     }
 
 @app.get("/queue/status")
@@ -206,10 +198,10 @@ async def queue_status():
     """Get queue status"""
     return {
         "is_processing": queue_service.is_processing,
-        "queue_ready": queue_service.queue is not None
+        "queue_ready": queue_service.queue is not None,
+        "workers": settings.rabbitmq_workers
     }
-
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8282, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8282)

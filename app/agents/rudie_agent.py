@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 class RudieAgent:
-    def __init__(self):
+    def __init__(self, astrology_service):
         self.kernel = sk.Kernel()
         
         # Add Ollama service
@@ -27,7 +27,7 @@ class RudieAgent:
         self.kernel.add_service(chat_service)
         
         # Add astrology tools plugin
-        self.tools_plugin = AstrologyTools()
+        self.tools_plugin = AstrologyTools(astrology_service)
         self.kernel.add_plugin(
             self.tools_plugin,
             plugin_name="astrology_tools"
@@ -199,14 +199,6 @@ Today's date: {{current_date}}"""
         """Generate response using Semantic Kernel with function calling"""
         try:
             current_date = datetime.now().strftime("%Y-%m-%d")
-            
-            # Set context in tools BEFORE calling LLM
-            AstrologyTools.set_context(
-                astrology_service=astrology_service,
-                date_of_birth=user_context['date_of_birth'],
-                time_of_birth=user_context['time_of_birth'],
-                place_of_birth=user_context['place_of_birth']
-            )
             
             # Prepare system prompt with context
             system_message = self.system_prompt.format(current_date=current_date)
