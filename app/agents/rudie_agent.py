@@ -60,7 +60,9 @@ PERSONALITY & STYLE:
 - Reply in 2-3 paragraphs (MAXIMUM 200 words total)
 - Use everyday language with specific cosmic insights
 - Add 2-3 fitting emojis naturally (🌞🌙✨💫💖🙏🌻)
-- NO markdown, NO lists, NO bullet points, NO bold text
+- NO markdown, NO lists, NO bullet points, NO bold text, NO TABLES, NO pipes (|)
+- Write in plain flowing paragraphs only - like a friendly text message
+- NEVER use structured formats - just natural conversational text
 
 RESPONSE STRUCTURE - DIRECT ANSWERS:
 
@@ -113,6 +115,8 @@ WHAT NOT TO DO:
 ❌ Too long: Over 200 words (Keep it punchy and readable)
 ❌ Wishy-washy: "Maybe" or "Could be" (Take a clear stance!)
 ❌ Generic: "The stars are good" (Be SPECIFIC about which planets and what they're doing)
+❌ Tables or structured data: "| Month | Rating |" (Write in PARAGRAPHS only!)
+❌ Formatted lists with numbers or bullets (Just write naturally!)
 
 ENGAGEMENT TRICKS:
 ✓ Use their name when you know it
@@ -128,7 +132,7 @@ Remember: You're not a fortune cookie - you're a trusted friend with cosmic inte
 Today's date: {{current_date}}"""
     
     def _extract_final_response(self, text: str) -> str:
-        """Extract final response, removing thinking tags, tool calls, and technical data"""
+        """Extract final response, removing thinking tags, tool calls, tables, and technical data"""
         if not text:
             return ""
         
@@ -144,6 +148,14 @@ Today's date: {{current_date}}"""
         text = re.sub(r'```json.*?```', '', text, flags=re.DOTALL)
         text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
         
+        # CRITICAL: Remove markdown tables (the main issue causing weird output)
+        # Remove entire table rows with pipes
+        text = re.sub(r'\|[^\n]+\|\n?', '', text, flags=re.MULTILINE)
+        # Remove table separators (like |---|---|)
+        text = re.sub(r'\|[\s\-:]+\|\n?', '', text, flags=re.MULTILINE)
+        # Remove any remaining lines with multiple pipes
+        text = re.sub(r'^[^\n]*\|[^\n]*\|[^\n]*$\n?', '', text, flags=re.MULTILINE)
+        
         # Remove any JSON-like structures
         text = re.sub(r'\{[^}]+\}', '', text)
         text = re.sub(r'\[[^\]]+\]', '', text)
@@ -154,16 +166,27 @@ Today's date: {{current_date}}"""
         text = re.sub(r'\d+/10', '', text)
         
         # Remove markdown formatting
-        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-        text = re.sub(r'\*(.*?)\*', r'\1', text)
-        text = re.sub(r'`([^`]+)`', r'\1', text)
-        text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-        text = re.sub(r'^\d+\.\s*', '', text, flags=re.MULTILINE)
-        text = re.sub(r'^-\s*', '', text, flags=re.MULTILINE)
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # Bold
+        text = re.sub(r'\*(.*?)\*', r'\1', text)      # Italic
+        text = re.sub(r'`([^`]+)`', r'\1', text)      # Inline code
+        text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)  # Headers
+        text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)  # Numbered lists
+        text = re.sub(r'^[-*]\s+', '', text, flags=re.MULTILINE)   # Bullet points
+        
+        # Remove horizontal rules
+        text = re.sub(r'^[\-=]{3,}$\n?', '', text, flags=re.MULTILINE)
+        
+        # Remove any remaining pipes (table remnants)
+        text = re.sub(r'\|', '', text)
+        
+        # Remove lines that look like headers or titles (ALL CAPS or ends with colon)
+        text = re.sub(r'^[A-Z\s]+:?\s*$\n?', '', text, flags=re.MULTILINE)
         
         # Clean up multiple spaces and newlines
-        text = re.sub(r'\n\s*\n', '\n', text)
-        text = re.sub(r' +', ' ', text)
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)  # Max 2 consecutive newlines
+        text = re.sub(r' +', ' ', text)  # Multiple spaces to single
+        text = re.sub(r'\n ', '\n', text)  # Remove leading spaces on lines
+        text = re.sub(r' \n', '\n', text)  # Remove trailing spaces before newlines
         
         return text.strip()
     

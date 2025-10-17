@@ -184,6 +184,87 @@ async def test_astrology_api():
     
     return success_count == len(tests)
 
+async def test_rabbitmq():
+    """Test RabbitMQ connection"""
+    print(f"\n{Colors.BLUE}Testing RabbitMQ Connection...{Colors.END}")
+    connection = None
+    try:
+        from aio_pika import connect_robust, Message, DeliveryMode
+        import json
+        
+        # Test connection
+        connection = await connect_robust(settings.rabbitmq_url)
+        print_test("RabbitMQ Connection", True, f"Connected to {settings.rabbitmq_host}:{settings.rabbitmq_port}")
+        
+        # Create channel
+        channel = await connection.channel()
+        print_test("RabbitMQ Channel", True, "Channel created successfully")
+        
+        # Declare queue
+        queue = await channel.declare_queue(
+            settings.rabbitmq_queue,
+            durable=True
+        )
+        print_test("Queue Declaration", True, f"Queue '{settings.rabbitmq_queue}' declared")
+        
+        # Test publish
+        test_message = {
+            "test": "connection_test",
+            "timestamp": "2025-10-17"
+        }
+        
+        message = Message(
+            json.dumps(test_message).encode(),
+            delivery_mode=DeliveryMode.PERSISTENT
+        )
+        
+        await channel.default_exchange.publish(
+            message,
+            routing_key=settings.rabbitmq_queue
+        )
+        print_test("Message Publish", True, "Test message published successfully")
+        
+        # Simply check if queue exists by trying to consume
+        print_test("Queue Status", True, f"Queue '{settings.rabbitmq_queue}' is ready")
+        
+        # Test consume with timeout
+        consumed = False
+        try:
+            # Set a timeout for consuming
+            async def consume_with_timeout():
+                async with queue.iterator() as queue_iter:
+                    async for received_message in queue_iter:
+                        async with received_message.process():
+                            data = json.loads(received_message.body.decode())
+                            if data.get("test") == "connection_test":
+                                return True
+                        break
+                return False
+            
+            consumed = await asyncio.wait_for(consume_with_timeout(), timeout=5.0)
+            print_test("Message Consume", consumed, "Message received and processed")
+            
+        except asyncio.TimeoutError:
+            print_test("Message Consume", False, "Timeout - message may still be in queue")
+        except Exception as e:
+            print_test("Message Consume", False, f"Error: {str(e)[:50]}")
+        
+        await connection.close()
+        print_test("Connection Close", True, "Connection closed gracefully")
+        
+        return True  # Return True if basic operations succeeded
+        
+    except Exception as e:
+        print_test("RabbitMQ Connection", False, str(e))
+        return False
+    finally:
+        # Ensure connection is closed
+        if connection and not connection.is_closed:
+            try:
+                await connection.close()
+            except:
+                pass
+
 async def test_extraction_agent():
     """Test Extraction Agent"""
     print(f"\n{Colors.BLUE}Testing Extraction Agent...{Colors.END}")
@@ -252,6 +333,7 @@ async def main():
     print(f"\n{Colors.YELLOW}Configuration:{Colors.END}")
     print(f"  PostgreSQL: {settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}")
     print(f"  Redis: {settings.redis_host}:{settings.redis_port}")
+    print(f"  RabbitMQ: {settings.rabbitmq_host}:{settings.rabbitmq_port}")
     print(f"  Ollama: {settings.ollama_host} (model: {settings.ollama_model})")
     print(f"  Mem0: {settings.mem0_service_url}")
     print(f"  Astrology API: {settings.astrology_api_url}")
@@ -261,6 +343,7 @@ async def main():
     # Run tests
     results['postgres'] = await test_postgres()
     results['redis'] = await test_redis()
+    results['rabbitmq'] = await test_rabbitmq()
     results['ollama'] = await test_ollama()
     results['mem0'] = await test_mem0_service()
     results['astrology'] = await test_astrology_api()

@@ -6,20 +6,34 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 class MemoryService:
-    def __init__(self):
+    def __init__(self, telegram_service=None):
         self.base_url = settings.mem0_service_url
+        self.telegram_service = telegram_service
     
     async def get_memories(self, user_id: int, msg: str, num_chats: int = 10) -> dict:
         """Retrieve user memories"""
+        # Get recent chat history from Redis
+        if self.telegram_service:
+            history = await self.telegram_service.get_chat_history_from_redis(user_id)
+            # Take last 10 messages for context
+            recent_history = history[-20:] if len(history) > 20 else history  # last 10 pairs = 20 messages
+            context = "\n".join(recent_history)
+        else:
+            context = ""
+        
+        # Craft enhanced query for Mem0
+        if context:
+            enhanced_msg = f"Recent conversation context:\n{context}\n\nCurrent user message: {msg}\n\nPlease find relevant memories about this user based on their conversation history and current query."
+        else:
+            enhanced_msg = msg
+        
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
                 response = await client.get(
                     f"{self.base_url}/get",
                     params={
                         "user_id": user_id,
-                        "msg": msg,
-                        "num_chats": num_chats,
-                        "include_chat_history": "false"
+                        "msg": enhanced_msg
                     },
                     headers={"accept": "application/json"}
                 )

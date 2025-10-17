@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     redis_password: str = ""
     redis_chat_history_limit: int = 5
     
+    # RabbitMQ
+    rabbitmq_host: str
+    rabbitmq_port: int = 5672
+    rabbitmq_user: str = "guest"
+    rabbitmq_password: str = "guest"
+    rabbitmq_vhost: str = "/"
+    rabbitmq_queue: str = "astrology_requests"
+    
     # Ollama
     ollama_host: str
     ollama_model: str
@@ -42,6 +50,10 @@ class Settings(BaseSettings):
         if self.redis_password:
             return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
         return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+    
+    @property
+    def rabbitmq_url(self) -> str:
+        return f"amqp://{self.rabbitmq_user}:{self.rabbitmq_password}@{self.rabbitmq_host}:{self.rabbitmq_port}{self.rabbitmq_vhost}"
     
     class Config:
         env_file = ".env"
