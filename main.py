@@ -134,10 +134,17 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Failed to connect to RabbitMQ: {e}")
         raise
     
-    # Start consumer in background
-    consumer_task = asyncio.create_task(
-        queue_service.start_consumer(astrology_worker.process_request)
-    )
+    # Start multiple consumers based on RABBITMQ_WORKERS
+    consumer_tasks = []
+    for worker_id in range(settings.rabbitmq_workers):
+        logger.info(f"👷 Starting worker {worker_id + 1}/{settings.rabbitmq_workers}")
+        task = asyncio.create_task(
+            queue_service.start_consumer(astrology_worker.process_request),
+            name=f"worker-{worker_id}"
+        )
+        consumer_tasks.append(task)
+    
+    logger.info(f"✅ Started {settings.rabbitmq_workers} worker(s)")
     
     # Start Telegram bot
     application = telegram_service.setup_application(
@@ -159,12 +166,15 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("🛑 Shutting down astrology bot...")
     
-    # Stop consumer
-    consumer_task.cancel()
-    try:
-        await consumer_task
-    except asyncio.CancelledError:
-        pass
+    # Stop all consumers
+    for task in consumer_tasks:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    
+    logger.info("✅ All workers stopped")
     
     # Disconnect from RabbitMQ
     await queue_service.disconnect()

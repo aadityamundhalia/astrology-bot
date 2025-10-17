@@ -49,11 +49,25 @@ async def handle_message(
                     username=message.from_user.username,
                     language_code=message.from_user.language_code,
                     is_premium=message.from_user.is_premium or False,
-                    date=int(message.date.timestamp())
+                    date=int(message.date.timestamp()),
+                    is_active=True,  # Default active
+                    priority=5  # Default priority
                 )
                 db.add(user)
                 await db.commit()
                 await db.refresh(user)
+            
+            # Check if user is active
+            if not user.is_active:
+                logger.warning(f"🚫 User {user_id} is inactive - rejecting request")
+                
+                stop_typing.set()
+                if typing_task:
+                    await typing_task
+                
+                response = "⚠️ Your account is currently inactive. Please contact support if you believe this is an error."
+                await telegram_service.send_message(chat_id, response)
+                return
             
             has_birth_data = validate_birth_data(
                 user.date_of_birth, 
@@ -100,18 +114,16 @@ async def handle_message(
                     await telegram_service.send_message(chat_id, response)
                     return
             
-            logger.info(f"✅ User {user_id} has birth data, queuing request...")
+            logger.info(f"✅ User {user_id} (priority: {user.priority}) has birth data, queuing request...")
             
-            # Get queue size to show user their position
-            queue_size = await queue_service.get_queue_size()
-            
-            # Publish request to queue
+            # Publish request to queue with priority
             request_id = str(uuid.uuid4())
             request_data = {
                 'request_id': request_id,
                 'user_id': user_id,
                 'chat_id': chat_id,
                 'message': text,
+                'priority': user.priority,  # Include priority
                 'user_context': {
                     'name': user.first_name,
                     'date_of_birth': user.date_of_birth,
@@ -126,8 +138,11 @@ async def handle_message(
             if typing_task:
                 await typing_task
             
-            # Send simple queued message without position
-            position_msg = "🔮 Reading the stars for you... ✨"
+            # Send message based on priority
+            if user.priority <= 2:
+                position_msg = "⚡ Priority user - reading the stars for you now... ✨"
+            else:
+                position_msg = "🔮 Reading the stars for you... ✨"
             
             await telegram_service.send_message(chat_id, position_msg)
             

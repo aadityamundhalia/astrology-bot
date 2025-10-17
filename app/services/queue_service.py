@@ -1,4 +1,4 @@
-"""RabbitMQ Queue Service for processing astrology requests"""
+"""RabbitMQ Queue Service with priority support"""
 import logging
 import json
 import asyncio
@@ -23,16 +23,19 @@ class QueueService:
             self.connection = await connect_robust(settings.rabbitmq_url)
             self.channel = await self.connection.channel()
             
-            # Set prefetch count to 1 to process one message at a time
-            await self.channel.set_qos(prefetch_count=1)
+            # Set prefetch count based on number of workers
+            await self.channel.set_qos(prefetch_count=settings.rabbitmq_workers)
             
-            # Declare queue
+            # Declare queue with priority support (max priority 10)
             self.queue = await self.channel.declare_queue(
                 settings.rabbitmq_queue,
-                durable=True  # Queue survives broker restart
+                durable=True,
+                arguments={
+                    "x-max-priority": 10  # Enable priority queue (1-10)
+                }
             )
             
-            logger.info(f"✅ Connected to RabbitMQ - Queue: {settings.rabbitmq_queue}")
+            logger.info(f"✅ Connected to RabbitMQ - Queue: {settings.rabbitmq_queue} (priority enabled)")
             
         except Exception as e:
             logger.error(f"❌ Failed to connect to RabbitMQ: {e}")
@@ -48,14 +51,22 @@ class QueueService:
             logger.error(f"Error disconnecting from RabbitMQ: {e}")
     
     async def publish_request(self, request_data: dict) -> str:
-        """Publish a request to the queue"""
+        """Publish a request to the queue with priority"""
         try:
             message_body = json.dumps(request_data).encode()
             
+            # Get priority from request (default 5)
+            priority = request_data.get('priority', 5)
+            # RabbitMQ priority: higher number = higher priority
+            # Our system: lower number = higher priority
+            # So invert: priority 1 -> RabbitMQ priority 9, priority 10 -> RabbitMQ priority 0
+            rabbitmq_priority = 10 - priority
+            
             message = Message(
                 message_body,
-                delivery_mode=DeliveryMode.PERSISTENT,  # Message survives broker restart
-                content_type="application/json"
+                delivery_mode=DeliveryMode.PERSISTENT,
+                content_type="application/json",
+                priority=rabbitmq_priority  # Set message priority
             )
             
             await self.channel.default_exchange.publish(
@@ -64,7 +75,7 @@ class QueueService:
             )
             
             request_id = request_data.get('request_id', 'unknown')
-            logger.info(f"📤 Published request {request_id} to queue")
+            logger.info(f"📤 Published request {request_id} (priority: {priority}) to queue")
             
             return request_id
             
@@ -84,8 +95,9 @@ class QueueService:
                         try:
                             request_data = json.loads(message.body.decode())
                             request_id = request_data.get('request_id', 'unknown')
+                            priority = request_data.get('priority', 5)
                             
-                            logger.info(f"📥 Processing request {request_id} from queue")
+                            logger.info(f"📥 Processing request {request_id} (priority: {priority}) from queue")
                             
                             # Call the handler to process the request
                             await handler(request_data)
@@ -94,7 +106,6 @@ class QueueService:
                             
                         except Exception as e:
                             logger.error(f"❌ Error processing message: {e}", exc_info=True)
-                            # Message will be requeued if not acknowledged
                             
         except asyncio.CancelledError:
             logger.info("🛑 Consumer stopped")
@@ -104,14 +115,8 @@ class QueueService:
             self.is_processing = False
     
     async def get_queue_size(self) -> int:
-        """
-        Get approximate queue size
-        Note: This is an estimate and may not be 100% accurate in all cases
-        """
+        """Get approximate queue size"""
         try:
-            # We can't easily get queue size with aio_pika without management API
-            # Return 0 as placeholder - users won't see exact position
-            # Alternative: Use RabbitMQ Management API (HTTP) for accurate count
             return 0
         except Exception as e:
             logger.error(f"Error getting queue size: {e}")

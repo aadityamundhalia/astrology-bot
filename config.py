@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     rabbitmq_password: str = "guest"
     rabbitmq_vhost: str = "/"
     rabbitmq_queue: str = "astrology_requests"
+    rabbitmq_workers: int = 1  # Add this
     
     # Ollama
     ollama_host: str
