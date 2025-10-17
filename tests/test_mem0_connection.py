@@ -80,5 +80,10 @@ async def test_mem0():
         except Exception as e:
             print(f"   ✗ Error: {e}")
 
+async def main():
+    """Main test function"""
+    await test_mem0()
+    return True  # Basic connectivity test
+
 if __name__ == "__main__":
     asyncio.run(test_mem0())

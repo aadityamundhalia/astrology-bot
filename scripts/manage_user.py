@@ -8,6 +8,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models import User
+from config import get_settings  # Add this import
+
+settings = get_settings()  # Add this line
 
 async def get_user(user_id: int):
     """Get user details"""
@@ -20,6 +23,7 @@ async def get_user(user_id: int):
             print(f"\n📊 User: {user.first_name} (ID: {user.id})")
             print(f"   Status: {'✅ Active' if user.is_active else '❌ Inactive'}")
             print(f"   Priority: {user.priority} {'⚡' if user.priority <= 2 else ''}")
+            print(f"   Strikes: {user.strikes}/{settings.max_strikes} {'⚠️' if user.strikes > 0 else '✅'}")
             print(f"   Username: @{user.username if user.username else 'N/A'}")
         else:
             print(f"❌ User {user_id} not found")
@@ -59,6 +63,21 @@ async def set_user_priority(user_id: int, priority: int):
         else:
             print(f"❌ User {user_id} not found")
 
+async def reset_strikes(user_id: int):
+    """Reset user strikes to 0"""
+    async with AsyncSessionLocal() as db:
+        stmt = select(User).where(User.id == user_id)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if user:
+            old_strikes = user.strikes
+            user.strikes = 0
+            await db.commit()
+            print(f"✅ User {user.first_name} (ID: {user_id}) strikes reset from {old_strikes} to 0")
+        else:
+            print(f"❌ User {user_id} not found")
+
 async def list_users():
     """List all users"""
     async with AsyncSessionLocal() as db:
@@ -70,7 +89,9 @@ async def list_users():
         for user in users:
             status = "✅" if user.is_active else "❌"
             priority_icon = "⚡" if user.priority <= 2 else ""
-            print(f"{status} {user.first_name} (ID: {user.id}) - Priority: {user.priority} {priority_icon}")
+            strikes_icon = "⚠️" if user.strikes > 0 else ""
+            strike_text = f" ({user.strikes} strikes)" if user.strikes > 0 else ""
+            print(f"{status} {user.first_name} (ID: {user.id}) - Priority: {user.priority} {priority_icon}{strike_text}{strikes_icon}")
 
 async def main():
     """Main menu"""
@@ -82,6 +103,7 @@ Usage:
   python scripts/manage_user.py activate <user_id>
   python scripts/manage_user.py deactivate <user_id>
   python scripts/manage_user.py priority <user_id> <1-10>
+  python scripts/manage_user.py reset-strikes <user_id>
         """)
         sys.exit(1)
     
@@ -97,6 +119,8 @@ Usage:
         await set_user_status(int(sys.argv[2]), False)
     elif command == "priority" and len(sys.argv) >= 4:
         await set_user_priority(int(sys.argv[2]), int(sys.argv[3]))
+    elif command == "reset-strikes" and len(sys.argv) >= 3:
+        await reset_strikes(int(sys.argv[2]))
     else:
         print("❌ Invalid command")
         sys.exit(1)

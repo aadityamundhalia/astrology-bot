@@ -5,8 +5,12 @@ import re
 
 from app.database import AsyncSessionLocal
 from app.models import User
+from app.utils.profanity_filter import is_rude_or_aggressive
+from config import get_settings
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 class AstrologyWorker:
     def __init__(
@@ -31,7 +35,7 @@ class AstrologyWorker:
             if missing_fields:
                 logger.warning(f"⚠️ Skipping malformed message - missing fields: {missing_fields}")
                 logger.debug(f"Message data: {request_data}")
-                return  # Skip this message
+                return
             
             # Validate user_context
             required_context = ['name', 'date_of_birth', 'time_of_birth', 'place_of_birth']
@@ -51,6 +55,57 @@ class AstrologyWorker:
             if isinstance(text, str) and ('test' in text.lower() or 'batch_test' in text.lower()):
                 logger.info(f"⏭️ Skipping test message: {request_id}")
                 return
+            
+            # Check for profanity/rudeness if enabled
+            if settings.enable_profanity_filter:
+                is_rude, reason = is_rude_or_aggressive(text)
+                
+                if is_rude:
+                    logger.warning(f"⚠️ Rude message detected from user {user_id}: {reason}")
+                    
+                    # Update user strikes
+                    async with AsyncSessionLocal() as db:
+                        stmt = select(User).where(User.id == user_id)
+                        result = await db.execute(stmt)
+                        user = result.scalar_one_or_none()
+                        
+                        if user:
+                            user.strikes += 1
+                            current_strikes = user.strikes
+                            
+                            # Check if max strikes reached
+                            if current_strikes >= settings.max_strikes:
+                                user.is_active = False
+                                await db.commit()
+                                
+                                logger.warning(f"🚫 User {user_id} deactivated - max strikes reached ({current_strikes}/{settings.max_strikes})")
+                                
+                                response = f"""🚫 **Account Deactivated**
+
+I've had to deactivate your account due to repeated inappropriate behavior ({current_strikes} strikes).
+
+Respectful communication is important to me. If you'd like to appeal this decision, please contact support.
+
+Take care! 🌿"""
+                                
+                                await self.telegram_service.send_message(chat_id, response)
+                                return
+                            else:
+                                await db.commit()
+                                
+                                logger.info(f"⚠️ Strike added to user {user_id}: {current_strikes}/{settings.max_strikes}")
+                                
+                                remaining = settings.max_strikes - current_strikes
+                                response = f"""⚠️ **Strike {current_strikes}/{settings.max_strikes}**
+
+Hey, I understand you might be frustrated, but I don't appreciate that kind of language. I'm here to help you with genuine cosmic guidance, and I'd really appreciate if we could keep our conversation respectful 🌿
+
+You have {remaining} warning{'s' if remaining != 1 else ''} remaining. If you reach {settings.max_strikes} strikes, your account will be automatically deactivated.
+
+Let's start fresh - what would you like to know about your stars? ✨"""
+                                
+                                await self.telegram_service.send_message(chat_id, response)
+                                return
             
             # Send typing indicator
             stop_typing = asyncio.Event()

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     rabbitmq_password: str = "guest"
     rabbitmq_vhost: str = "/"
     rabbitmq_queue: str = "astrology_requests"
-    rabbitmq_workers: int = 1  # Add this
+    rabbitmq_workers: int = 1
     
     # Ollama
     ollama_host: str
@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # Services
     mem0_service_url: str
     astrology_api_url: str
+    
+    # User Management
+    max_strikes: int = 3
+    enable_profanity_filter: bool = True
     
     # App
     log_level: str = "INFO"

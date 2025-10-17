@@ -32,6 +32,13 @@ A friendly, AI-powered Telegram bot that provides personalized Vedic astrology p
 - 🔐 User status management (active/inactive)
 - 📈 Ready for monetization with priority tiers
 
+### 🛡️ Moderation & Safety
+- ⚠️ Automatic profanity detection
+- 📊 Strike system (configurable max strikes)
+- 🚫 Auto-deactivation after max strikes
+- 🔄 Admin strike reset capability
+- 📝 Polite warnings before deactivation
+
 ## Tech Stack
 
 - **Framework**: FastAPI (with lifespan management)
@@ -408,6 +415,36 @@ The bot includes priority system for paid tiers:
 - Premium plan: Priority 1-2
 
 Implement payment gateway and update user priority upon payment.
+
+## Strike System
+
+The bot includes an automatic moderation system to maintain respectful interactions:
+
+### How it Works
+1. User sends rude/profane message
+2. Bot detects inappropriate content
+3. Strike is added to user's account
+4. User receives warning with remaining strikes
+5. After max strikes, account is auto-deactivated
+
+### Configuration
+```bash
+MAX_STRIKES=3                    # Number of strikes before deactivation
+ENABLE_PROFANITY_FILTER=true    # Enable/disable moderation
+```
+
+### Strike Management
+- View strikes: `python scripts/manage_user.py get <user_id>`
+- Reset strikes: `python scripts/manage_user.py reset-strikes <user_id>`
+- Strikes are logged in database for audit trail
+
+### What Triggers a Strike
+- Profanity and vulgar language
+- Insults and aggressive commands
+- Disrespectful behavior
+- The bot responds politely but firmly
+
+Users are given clear warnings and know exactly how many strikes remain before deactivation.
 
 ## License
 

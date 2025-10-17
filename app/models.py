@@ -21,13 +21,15 @@ class User(Base):
     horary_data = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # New columns
+    # User management columns
     is_active = Column(Boolean, default=True, nullable=False, index=True)
-    priority = Column(Integer, default=5, nullable=False, index=True)  # 1=highest, 10=lowest
+    priority = Column(Integer, default=5, nullable=False, index=True)
+    strikes = Column(Integer, default=0, nullable=False, index=True)  # Add this
     
     __table_args__ = (
         Index('idx_users_priority', 'priority'),
         Index('idx_users_is_active', 'is_active'),
+        Index('idx_users_strikes', 'strikes'),
     )
 
 class ChatHistory(Base):

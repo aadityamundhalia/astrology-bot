@@ -200,12 +200,13 @@ async def test_rabbitmq():
         channel = await connection.channel()
         print_test("RabbitMQ Channel", True, "Channel created successfully")
         
-        # Declare queue
+        # Declare queue WITH priority support (matching production)
         queue = await channel.declare_queue(
             settings.rabbitmq_queue,
-            durable=True
+            durable=True,
+            arguments={"x-max-priority": 10}  # Match production queue
         )
-        print_test("Queue Declaration", True, f"Queue '{settings.rabbitmq_queue}' declared")
+        print_test("Queue Declaration", True, f"Queue '{settings.rabbitmq_queue}' declared with priority")
         
         # Test publish
         test_message = {
@@ -215,7 +216,8 @@ async def test_rabbitmq():
         
         message = Message(
             json.dumps(test_message).encode(),
-            delivery_mode=DeliveryMode.PERSISTENT
+            delivery_mode=DeliveryMode.PERSISTENT,
+            priority=5  # Set priority
         )
         
         await channel.default_exchange.publish(
@@ -224,13 +226,11 @@ async def test_rabbitmq():
         )
         print_test("Message Publish", True, "Test message published successfully")
         
-        # Simply check if queue exists by trying to consume
         print_test("Queue Status", True, f"Queue '{settings.rabbitmq_queue}' is ready")
         
         # Test consume with timeout
         consumed = False
         try:
-            # Set a timeout for consuming
             async def consume_with_timeout():
                 async with queue.iterator() as queue_iter:
                     async for received_message in queue_iter:
@@ -369,5 +369,8 @@ async def main():
     else:
         print(f"{Colors.RED}⚠️  Some tests failed. Please fix the issues above.{Colors.END}\n")
 
+    return passed == total
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    success = asyncio.run(main())
+    sys.exit(0 if success else 1)
